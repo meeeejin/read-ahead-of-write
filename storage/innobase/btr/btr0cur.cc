@@ -268,9 +268,22 @@ btr_cur_latch_leaves(
 				space, zip_size, left_page_no,
 				RW_X_LATCH, cursor->index, mtr);
 #ifdef UNIV_BTR_DEBUG
-			ut_a(page_is_comp(get_block->frame)
+            if (page_is_comp(get_block->frame) != page_is_comp(page)) {
+                fprintf(stderr, "btr0cur1 = (%lu, %lu)\n",
+                        page_is_comp(get_block->frame),
+                        page_is_comp(page));
+            }
+            ut_a(page_is_comp(get_block->frame)
 			     == page_is_comp(page));
-			ut_a(btr_page_get_next(get_block->frame, mtr)
+
+            if (btr_page_get_next(get_block->frame, mtr) != page_get_page_no(page)) {
+                fprintf(stderr, "btr0cur2 = (%lu, %lu), (%lu, %lu)\n",
+                        space,
+                        btr_page_get_prev(get_block->frame, mtr),
+                        page_get_space_id(page),
+                        page_get_page_no(page));
+            }
+            ut_a(btr_page_get_next(get_block->frame, mtr)
 			     == page_get_page_no(page));
 #endif /* UNIV_BTR_DEBUG */
 			get_block->check_index_page_at_flush = TRUE;
@@ -291,9 +304,22 @@ btr_cur_latch_leaves(
 				space, zip_size, right_page_no,
 				RW_X_LATCH, cursor->index, mtr);
 #ifdef UNIV_BTR_DEBUG
-			ut_a(page_is_comp(get_block->frame)
-			     == page_is_comp(page));
-			ut_a(btr_page_get_prev(get_block->frame, mtr)
+            if (page_is_comp(get_block->frame) != page_is_comp(page)) {
+                fprintf(stderr, "btr0cur3 = (%lu, %lu)\n",
+                        page_is_comp(get_block->frame),
+                        page_is_comp(page));
+            }
+            ut_a(page_is_comp(get_block->frame)
+                    == page_is_comp(page));
+
+            if (btr_page_get_prev(get_block->frame, mtr) != page_get_page_no(page)) {
+                fprintf(stderr, "btr0cur4 = (%lu, %lu), (%lu, %lu)\n",
+                        space,
+                        btr_page_get_prev(get_block->frame, mtr),
+                        page_get_space_id(page),
+                        page_get_page_no(page));
+            }
+            ut_a(btr_page_get_prev(get_block->frame, mtr)
 			     == page_get_page_no(page));
 #endif /* UNIV_BTR_DEBUG */
 			get_block->check_index_page_at_flush = TRUE;

@@ -176,6 +176,32 @@ buf_read_page_low(
 
 	ut_ad(buf_page_in_file(bpage));
 
+    /* mijin */
+    buf_pool_t* buf_pool = buf_pool_get(space, offset);
+
+    if (buf_pool->need_to_flush_copy_pool) {
+        ulint fold;
+        copy_pool_meta_dir_t* entry;
+
+        fold = buf_page_address_fold(space, offset);
+
+check:
+        rw_lock_s_lock(buf_pool->copy_pool_cache_hash_lock);
+        HASH_SEARCH(hash, buf_pool->copy_pool_cache, fold, copy_pool_meta_dir_t*, entry, ut_ad(1), 
+                    entry->space == bpage->space && entry->offset == bpage->offset);
+        rw_lock_s_unlock(buf_pool->copy_pool_cache_hash_lock);
+
+        if (entry) {
+            fprintf(stderr, "Need to flush copy pool [%lu]..(%u, %u)\n",
+                            buf_pool->instance_no,
+                            entry->space, entry->offset);
+
+            os_thread_sleep(100000);
+            goto check;
+        }
+    }
+    /* end */
+
 	if (sync) {
 		thd_wait_begin(NULL, THD_WAIT_DISKIO);
 	}

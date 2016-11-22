@@ -1994,18 +1994,31 @@ struct buf_pool_t{
 
     /* mijin */
     ibool       need_to_flush_copy_pool;
+    ibool       batch_running;
+    os_event_t  b_event;
 
     byte*       write_buf_unaligned;
     byte*       write_buf;
 
     ulint       first_free;
     ulint       total_entry;
+    
+    hash_table_t*   copy_pool_cache;
+    rw_lock_t*      copy_pool_cache_hash_lock;
     /* end */
 #if BUF_BUDDY_LOW > UNIV_ZIP_SIZE_MIN
 # error "BUF_BUDDY_LOW > UNIV_ZIP_SIZE_MIN"
 #endif
 	/* @} */
 };
+
+/* mijin */
+struct copy_pool_meta_dir_t {
+    ib_uint32_t     space;      /* tablespace id */
+    ib_uint32_t     offset;     /* page number */
+    copy_pool_meta_dir_t* hash;
+};
+/* end */
 
 /** @name Accessors for buf_pool->mutex.
 Use these instead of accessing buf_pool->mutex directly. */

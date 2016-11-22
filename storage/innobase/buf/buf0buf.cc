@@ -1370,15 +1370,26 @@ buf_pool_init_instance(
 
     /* mijin */
     buf_pool->need_to_flush_copy_pool = false;
-    buf_pool->total_entry = 2400;
+    buf_pool->batch_running = false;
+    buf_pool->b_event = os_event_create();
+
+    buf_pool->total_entry = 4800;
     buf_pool->first_free = 0;
 
     buf_pool->write_buf_unaligned = static_cast<byte*>(
-            ut_malloc(buf_pool->total_entry * UNIV_PAGE_SIZE));
+            ut_malloc((1 + buf_pool->total_entry) * UNIV_PAGE_SIZE));
 
     buf_pool->write_buf = static_cast<byte*>(
             ut_align(buf_pool->write_buf_unaligned,
                 UNIV_PAGE_SIZE));
+
+    buf_pool->copy_pool_cache = ha_create(2 * buf_pool->total_entry,
+            srv_n_page_hash_locks,
+            MEM_HEAP_FOR_PAGE_HASH,
+            SYNC_BUF_PAGE_HASH);
+
+    buf_pool->copy_pool_cache_hash_lock = static_cast<rw_lock_t*>(mem_alloc(sizeof(rw_lock_t)));
+    rw_lock_create(buf_block_lock_key, buf_pool->copy_pool_cache_hash_lock, SYNC_LEVEL_VARYING);
     /* end */
 
 	/* All fields are initialized by mem_zalloc(). */
@@ -4331,6 +4342,32 @@ corrupt:
 		}
 
 		buf_pool->stat.n_pages_written++;
+        
+        /* mijin */
+        if (bpage->copy_target) {
+            fprintf(stderr, "before delete from hash table = (%u, %u)\n",
+                    bpage->space, bpage->offset);
+
+            copy_pool_meta_dir_t* entry;
+            ulint fold;
+
+            fold = buf_page_address_fold(bpage->space, bpage->offset);
+
+            rw_lock_s_lock(buf_pool->copy_pool_cache_hash_lock);
+            HASH_SEARCH(hash, buf_pool->copy_pool_cache, fold, copy_pool_meta_dir_t*, entry, ut_ad(1),
+                    entry->space == bpage->space && entry->offset == bpage->offset); 
+            rw_lock_s_unlock(buf_pool->copy_pool_cache_hash_lock);
+
+            if (entry) {
+                rw_lock_x_lock(buf_pool->copy_pool_cache_hash_lock);
+                HASH_DELETE(copy_pool_meta_dir_t, hash, buf_pool->copy_pool_cache, fold, entry);
+                rw_lock_x_unlock(buf_pool->copy_pool_cache_hash_lock);
+            }
+
+            fprintf(stderr, "after delete from hash table = (%u, %u)\n",
+                    bpage->space, bpage->offset);
+        }
+        /* end */
 
 		break;
 

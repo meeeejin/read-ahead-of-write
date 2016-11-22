@@ -5143,6 +5143,7 @@ found:
 
 		ret = TRUE;
 	} else {
+
 		errno = -slot->ret;
 
 		/* os_file_handle_error does tell us if we should retry
