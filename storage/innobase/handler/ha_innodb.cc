@@ -286,7 +286,7 @@ static PSI_mutex_info all_innodb_mutexes[] = {
 	{&buffer_block_mutex_key, "buffer_block_mutex", 0},
 #  endif /* !PFS_SKIP_BUFFER_MUTEX_RWLOCK */
 	{&buf_pool_mutex_key, "buf_pool_mutex", 0},
-	{&buf_pool_zip_mutex_key, "buf_pool_zip_mutex", 0},
+    {&buf_pool_zip_mutex_key, "buf_pool_zip_mutex", 0},
 	{&cache_last_read_mutex_key, "cache_last_read_mutex", 0},
 	{&dict_foreign_err_mutex_key, "dict_foreign_err_mutex", 0},
 	{&dict_sys_mutex_key, "dict_sys_mutex", 0},

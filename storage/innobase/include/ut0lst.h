@@ -268,7 +268,13 @@ ut_list_remove(
 {
 	ut_list_node<Type>&	elem_node = ut_elem_get_node(elem, offset);
 
-	ut_a(list.count > 0);
+    /* mijin */
+    if (list.count <= 0) {
+        fprintf(stderr, "list count is zero..\n");
+        return;
+    }
+	//ut_a(list.count > 0);
+    /* end */
 
 	if (elem_node.next != NULL) {
 		ut_list_node<Type>&	next_node =
