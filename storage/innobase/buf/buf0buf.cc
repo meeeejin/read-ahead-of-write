@@ -1371,9 +1371,12 @@ buf_pool_init_instance(
     /* mijin */
     buf_pool->need_to_flush_copy_pool = false;
     buf_pool->batch_running = false;
+    buf_pool->flush_running = false;
+    
     buf_pool->b_event = os_event_create();
+    buf_pool->f_event = os_event_create();
 
-    buf_pool->total_entry = 4800;
+    buf_pool->total_entry = 7200;
     buf_pool->first_free = 0;
 
     buf_pool->write_buf_unaligned = static_cast<byte*>(
@@ -1607,7 +1610,9 @@ buf_relocate(
 
 	/* relocate buf_pool->LRU */
 	b = UT_LIST_GET_PREV(LRU, bpage);
+    fprintf(stderr, "before buf_relocate\n");
 	UT_LIST_REMOVE(LRU, buf_pool->LRU, bpage);
+    fprintf(stderr, "after buf_relocate\n");
 
 	if (b) {
 		UT_LIST_INSERT_AFTER(LRU, buf_pool->LRU, b, dpage);
@@ -4136,7 +4141,13 @@ buf_page_io_complete(
 	buf_pool_t*	buf_pool = buf_pool_from_bpage(bpage);
 	const ibool	uncompressed = (buf_page_get_state(bpage)
 					== BUF_BLOCK_FILE_PAGE);
-
+    
+    /* mijin */
+    if (!buf_page_in_file(bpage)) {
+        fprintf(stderr, "cannot io complete = (%u, %u), %d\n",
+                        bpage->space, bpage->offset, bpage->state);
+    }
+    /* end */
 	ut_a(buf_page_in_file(bpage));
 
 	/* We do not need protect io_fix here by mutex to read
@@ -4336,18 +4347,19 @@ corrupt:
 
 		buf_flush_write_complete(bpage);
 
-		if (uncompressed) {
-			rw_lock_s_unlock_gen(&((buf_block_t*) bpage)->lock,
-					     BUF_IO_WRITE);
-		}
+        /* mijin */
+        if (!bpage->copy_target) {
+            if (uncompressed) {
+                rw_lock_s_unlock_gen(&((buf_block_t*) bpage)->lock,
+                        BUF_IO_WRITE);
+            }
+        }
+        /* end */
 
 		buf_pool->stat.n_pages_written++;
         
         /* mijin */
         if (bpage->copy_target) {
-            fprintf(stderr, "before delete from hash table = (%u, %u)\n",
-                    bpage->space, bpage->offset);
-
             copy_pool_meta_dir_t* entry;
             ulint fold;
 
@@ -4364,7 +4376,7 @@ corrupt:
                 rw_lock_x_unlock(buf_pool->copy_pool_cache_hash_lock);
             }
 
-            fprintf(stderr, "after delete from hash table = (%u, %u)\n",
+            fprintf(stderr, "delete from hash table = (%u, %u)\n",
                     bpage->space, bpage->offset);
         }
         /* end */
