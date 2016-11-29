@@ -1995,7 +1995,10 @@ struct buf_pool_t{
     /* mijin */
     ibool       need_to_flush_copy_pool;
     ibool       batch_running;
+    ibool       flush_running;
+    
     os_event_t  b_event;
+    os_event_t  f_event;
 
     byte*       write_buf_unaligned;
     byte*       write_buf;

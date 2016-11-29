@@ -389,6 +389,7 @@ buf_buddy_block_free(
 
 	block = (buf_block_t*) bpage;
 	mutex_enter(&block->mutex);
+   
 	buf_LRU_block_free_non_file_page(block);
 	mutex_exit(&block->mutex);
 
