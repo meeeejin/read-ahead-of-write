@@ -600,9 +600,7 @@ buf_flush_remove(
 #endif /* UNIV_DEBUG || UNIV_BUF_DEBUG */
 		break;
 	case BUF_BLOCK_FILE_PAGE:
-        fprintf(stderr, "before buf_flush_remove\n");
 		UT_LIST_REMOVE(list, buf_pool->flush_list, bpage);
-        fprintf(stderr, "after buf_flush_remove\n");
 		break;
 	}
 
@@ -681,9 +679,7 @@ buf_flush_relocate_on_flush_list(
 
     prev = UT_LIST_GET_PREV(list, bpage);
     
-    fprintf(stderr, "before buf_flush_relocate_on_flush_list\n");
 	UT_LIST_REMOVE(list, buf_pool->flush_list, bpage);
-    fprintf(stderr, "after buf_flush_relocate_on_flush_list\n");
 
 	if (prev) {
 		ut_ad(prev->in_flush_list);
@@ -1323,9 +1319,9 @@ buf_flush_page_and_try_neighbors(
 {
 	ibool		flushed;
 	ib_mutex_t*	block_mutex;
-#ifdef UNIV_DEBUG
+//#ifdef UNIV_DEBUG
 	buf_pool_t*	buf_pool = buf_pool_from_bpage(bpage);
-#endif /* UNIV_DEBUG */
+//#endif /* UNIV_DEBUG */
 
 	ut_ad(buf_pool_mutex_own(buf_pool));
 
@@ -1334,7 +1330,7 @@ buf_flush_page_and_try_neighbors(
 
     /* mijin */
     if (!buf_page_in_file(bpage)) {
-        fprintf(stderr, "buf_flush_page_and_... = (%u, %u) / %d\n", bpage->space, bpage->offset, bpage->state);
+        fprintf(stderr, "buf_flush_page_and_... = (%u, %u) / %d, %lu\n", bpage->space, bpage->offset, bpage->state, buf_pool->instance_no);
     }
     /* end */
 
@@ -1453,6 +1449,12 @@ buf_flush_LRU_list_batch(
 	ulint		lru_len = UT_LIST_GET_LEN(buf_pool->LRU);
 
 	ut_ad(buf_pool_mutex_own(buf_pool));
+
+    /* mijin */
+
+    fprintf(stderr, "start buf_flush_LRU_list batch in buffer pool[%lu]\n", buf_pool->instance_no);
+
+    /* end */
 
 	bpage = UT_LIST_GET_LAST(buf_pool->LRU);
 	while (bpage != NULL && count < max
@@ -1607,6 +1609,11 @@ buf_do_flush_list_batch(
 	buf_flush_list_mutex_enter(buf_pool);
 	ulint len = UT_LIST_GET_LEN(buf_pool->flush_list);
 
+    /* mijin */                                                                                                                                                                                              
+    fprintf(stderr, "start buf_do_flush_list batch in buffer pool[%lu]\n", buf_pool->instance_no);                                                                                                          
+
+    /* end */
+
 	/* In order not to degenerate this scan to O(n*n) we attempt
 	to preserve pointer of previous block in the flush list. To do
 	so we declare it a hazard pointer. Any thread working on the
@@ -1618,6 +1625,10 @@ buf_do_flush_list_batch(
 	     ++scanned) {
 
 		buf_page_t*	prev;
+
+        if (bpage->oldest_modification == 0 || bpage->state == BUF_BLOCK_NOT_USED) {
+            fprintf(stderr, "clean page in flush_list (%u, %u)\n", bpage->space, bpage->offset);
+        }
 
 		ut_a(bpage->oldest_modification > 0);
 		ut_ad(bpage->in_flush_list);
@@ -2126,8 +2137,12 @@ try_again:
                 bpage->offset = mach_read_from_4(tmp_buf + FIL_PAGE_OFFSET);
                
                 bpage->newest_modification = mach_read_from_8(tmp_buf + FIL_PAGE_LSN);
+                bpage->oldest_modification = mach_read_from_8(tmp_buf + FIL_PAGE_LSN);
                 bpage->state = BUF_BLOCK_FILE_PAGE;
                 bpage->copy_target = true;
+
+                buf_pool_t* tmp_buf_pool = buf_pool_get(bpage->space, bpage->offset);
+                bpage->buf_pool_index = tmp_buf_pool->instance_no;
 
                 /* FLush the target page. */
                 fprintf(stderr, "before flush %lu = (%u, %u)!\n", i, bpage->space, bpage->offset);

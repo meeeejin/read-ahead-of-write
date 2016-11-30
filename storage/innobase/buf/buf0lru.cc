@@ -1138,9 +1138,7 @@ buf_LRU_get_free_only(
         /* end */
 		ut_a(!buf_page_in_file(&block->page));
 
-        fprintf(stderr, "before buf_LRU_get_free_only (%u, %u)\n", (&block->page)->space, (&block->page)->offset);
         UT_LIST_REMOVE(list, buf_pool->free, (&block->page));
-        fprintf(stderr, "after buf_LRU_get_free_only\n");
 
 		mutex_enter(&block->mutex);
 
@@ -1695,9 +1693,10 @@ buf_LRU_remove_block(
 	}
 
 	/* Remove the block from the LRU list */
-    fprintf(stderr, "before buf_LRU_remove_block\n");
 	UT_LIST_REMOVE(LRU, buf_pool->LRU, bpage);
-    fprintf(stderr, "after buf_LRU_remove_block\n");
+    if (bpage->copy_target) {
+       UT_LIST_REMOVE(list, buf_pool->flush_list, bpage); 
+    }
 	ut_d(bpage->in_LRU_list = FALSE);
 
 	zip_size = page_zip_get_size(&bpage->zip);
@@ -2260,6 +2259,12 @@ buf_LRU_block_free_non_file_page(
 		mutex_enter(&block->mutex);
 		page_zip_set_size(&block->page.zip, 0);
 	}
+
+    /* mijin */
+    if ((&block->page)->copy_target) {
+        (&block->page)->copy_target = false;
+    }
+    /* end */
 
     UT_LIST_ADD_FIRST(list, buf_pool->free, (&block->page));
 	ut_d(block->page.in_free_list = TRUE);
