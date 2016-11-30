@@ -1026,22 +1026,15 @@ buf_flush_page(
 		/* This is a heuristic, to avoid expensive S attempts. */
 		flush = FALSE;
 	} else {
+        rw_lock = &reinterpret_cast<buf_block_t*>(bpage)->lock;
 
-        /* mijin */
-        if (!bpage->copy_target) {
-            rw_lock = &reinterpret_cast<buf_block_t*>(bpage)->lock;
-
-            if (flush_type != BUF_FLUSH_LIST) {
-                flush = rw_lock_s_lock_gen_nowait(
-                        rw_lock, BUF_IO_WRITE);
-            } else {
-                /* Will S lock later */
-                flush = TRUE;
-            }
+        if (flush_type != BUF_FLUSH_LIST) {
+            flush = rw_lock_s_lock_gen_nowait(
+                    rw_lock, BUF_IO_WRITE);
         } else {
+            /* Will S lock later */
             flush = TRUE;
         }
-        /* end*/
 	}
 
     if (flush) {
@@ -2118,7 +2111,8 @@ try_again:
                 block = (buf_block_t*) malloc(sizeof(buf_block_t));
                 memset(block, 0, sizeof(buf_block_t));
                 mutex_create(buffer_block_mutex_key, &block->mutex, SYNC_BUF_BLOCK);
-               
+                rw_lock_create(buf_block_lock_key, &block->lock, SYNC_LEVEL_VARYING);  
+
                 assert(!posix_memalign((void **) &tmp_buf, 4096, UNIV_PAGE_SIZE));
                 
                 /* Copy buffer frame from write_buf to tmp_buf. */
