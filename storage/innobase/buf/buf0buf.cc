@@ -1610,9 +1610,7 @@ buf_relocate(
 
 	/* relocate buf_pool->LRU */
 	b = UT_LIST_GET_PREV(LRU, bpage);
-    fprintf(stderr, "before buf_relocate\n");
 	UT_LIST_REMOVE(LRU, buf_pool->LRU, bpage);
-    fprintf(stderr, "after buf_relocate\n");
 
 	if (b) {
 		UT_LIST_INSERT_AFTER(LRU, buf_pool->LRU, b, dpage);
@@ -4356,8 +4354,9 @@ corrupt:
         
         /* mijin */
         if (bpage->copy_target) {
-            copy_pool_meta_dir_t* entry;
+            copy_pool_meta_dir_t* entry = NULL;
             ulint fold;
+            //buf_pool_t* tmp_buf_pool = buf_pool_get(bpage->space, bpage->offset);
 
             fold = buf_page_address_fold(bpage->space, bpage->offset);
 
@@ -4370,10 +4369,16 @@ corrupt:
                 rw_lock_x_lock(buf_pool->copy_pool_cache_hash_lock);
                 HASH_DELETE(copy_pool_meta_dir_t, hash, buf_pool->copy_pool_cache, fold, entry);
                 rw_lock_x_unlock(buf_pool->copy_pool_cache_hash_lock);
+            
+                fprintf(stderr, "delete from hash table [%lu] = (%u, %u)\n",
+                        buf_pool->instance_no, bpage->space, bpage->offset);
+            } else {
+                fprintf(stderr, "fail to delete from hash table [%lu] = (%u, %u)\n",
+                        buf_pool->instance_no, bpage->space, bpage->offset);
+            
             }
 
-            fprintf(stderr, "delete from hash table = (%u, %u)\n",
-                    bpage->space, bpage->offset);
+            bpage->copy_target = false;
         }
         /* end */
 

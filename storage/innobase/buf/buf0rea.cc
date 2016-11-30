@@ -186,6 +186,8 @@ buf_read_page_low(
         fold = buf_page_address_fold(space, offset);
 
 check:
+        entry = NULL;
+        
         rw_lock_s_lock(buf_pool->copy_pool_cache_hash_lock);
         HASH_SEARCH(hash, buf_pool->copy_pool_cache, fold, copy_pool_meta_dir_t*, entry, ut_ad(1), 
                     entry->space == bpage->space && entry->offset == bpage->offset);
