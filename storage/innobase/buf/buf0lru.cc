@@ -1132,9 +1132,6 @@ buf_LRU_get_free_only(
                             buf_page_get_state(&block->page),
                             (&block->page)->oldest_modification,
                             (&block->page)->space, (&block->page)->offset);
-
-                    UT_LIST_REMOVE(list, buf_pool->free, (&block->page));
-                    return(NULL);
                 }
             }
         }
@@ -2375,7 +2372,7 @@ buf_LRU_block_remove_hashed(
 	case BUF_BLOCK_ZIP_PAGE:
         /* mijin */
         if (!bpage->copy_target) {
-		    ut_a(bpage->oldest_modification == 0);
+            ut_a(bpage->oldest_modification == 0);
         }
         /* end */
 		UNIV_MEM_ASSERT_W(bpage->zip.data,

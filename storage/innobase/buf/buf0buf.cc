@@ -4347,14 +4347,10 @@ corrupt:
 
 		buf_flush_write_complete(bpage);
 
-        /* mijin */
-        if (!bpage->copy_target) {
-            if (uncompressed) {
-                rw_lock_s_unlock_gen(&((buf_block_t*) bpage)->lock,
-                        BUF_IO_WRITE);
-            }
+        if (uncompressed) {
+            rw_lock_s_unlock_gen(&((buf_block_t*) bpage)->lock,
+                    BUF_IO_WRITE);
         }
-        /* end */
 
 		buf_pool->stat.n_pages_written++;
         
