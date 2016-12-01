@@ -4140,12 +4140,6 @@ buf_page_io_complete(
 	const ibool	uncompressed = (buf_page_get_state(bpage)
 					== BUF_BLOCK_FILE_PAGE);
     
-    /* mijin */
-    if (!buf_page_in_file(bpage)) {
-        fprintf(stderr, "cannot io complete = (%u, %u), %d\n",
-                        bpage->space, bpage->offset, bpage->state);
-    }
-    /* end */
 	ut_a(buf_page_in_file(bpage));
 
 	/* We do not need protect io_fix here by mutex to read
@@ -4356,7 +4350,6 @@ corrupt:
         if (bpage->copy_target) {
             copy_pool_meta_dir_t* entry = NULL;
             ulint fold;
-            //buf_pool_t* tmp_buf_pool = buf_pool_get(bpage->space, bpage->offset);
 
             fold = buf_page_address_fold(bpage->space, bpage->offset);
 
@@ -4372,10 +4365,6 @@ corrupt:
             
                 fprintf(stderr, "delete from hash table [%lu] = (%u, %u)\n",
                         buf_pool->instance_no, bpage->space, bpage->offset);
-            } else {
-                fprintf(stderr, "fail to delete from hash table [%lu] = (%u, %u)\n",
-                        buf_pool->instance_no, bpage->space, bpage->offset);
-            
             }
 
             bpage->copy_target = false;

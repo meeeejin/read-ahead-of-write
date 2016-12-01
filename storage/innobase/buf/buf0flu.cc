@@ -1319,20 +1319,14 @@ buf_flush_page_and_try_neighbors(
 {
 	ibool		flushed;
 	ib_mutex_t*	block_mutex;
-//#ifdef UNIV_DEBUG
+#ifdef UNIV_DEBUG
 	buf_pool_t*	buf_pool = buf_pool_from_bpage(bpage);
-//#endif /* UNIV_DEBUG */
+#endif /* UNIV_DEBUG */
 
 	ut_ad(buf_pool_mutex_own(buf_pool));
 
 	block_mutex = buf_page_get_mutex(bpage);
 	mutex_enter(block_mutex);
-
-    /* mijin */
-    if (!buf_page_in_file(bpage)) {
-        fprintf(stderr, "buf_flush_page_and_... = (%u, %u) / %d, %lu\n", bpage->space, bpage->offset, bpage->state, buf_pool->instance_no);
-    }
-    /* end */
 
 	ut_a(buf_page_in_file(bpage));
 
@@ -1449,12 +1443,6 @@ buf_flush_LRU_list_batch(
 	ulint		lru_len = UT_LIST_GET_LEN(buf_pool->LRU);
 
 	ut_ad(buf_pool_mutex_own(buf_pool));
-
-    /* mijin */
-
-    fprintf(stderr, "start buf_flush_LRU_list batch in buffer pool[%lu]\n", buf_pool->instance_no);
-
-    /* end */
 
 	bpage = UT_LIST_GET_LAST(buf_pool->LRU);
 	while (bpage != NULL && count < max
@@ -1608,11 +1596,6 @@ buf_do_flush_list_batch(
 	block to be flushed. */
 	buf_flush_list_mutex_enter(buf_pool);
 	ulint len = UT_LIST_GET_LEN(buf_pool->flush_list);
-
-    /* mijin */                                                                                                                                                                                              
-    fprintf(stderr, "start buf_do_flush_list batch in buffer pool[%lu]\n", buf_pool->instance_no);                                                                                                          
-
-    /* end */
 
 	/* In order not to degenerate this scan to O(n*n) we attempt
 	to preserve pointer of previous block in the flush list. To do
