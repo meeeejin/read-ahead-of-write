@@ -1114,33 +1114,13 @@ buf_LRU_get_free_only(
 		ut_ad(!block->page.in_flush_list);
 		ut_ad(!block->page.in_LRU_list);
         
-        /* mijin */
-        if (buf_page_in_file(&block->page)) {
-            if ((&block->page)->copy_target) {
-                fprintf(stderr, "copy target...%d, %lu / (%u, %u)\n",
-                        buf_page_get_state(&block->page),
-                        (&block->page)->oldest_modification,
-                        (&block->page)->space, (&block->page)->offset);
-            } else {
-                fprintf(stderr, "not copy target...%d, %lu / (%u, %u)\n",
-                        buf_page_get_state(&block->page),
-                        (&block->page)->oldest_modification,
-                        (&block->page)->space, (&block->page)->offset);
-
-                if ((&block->page)->oldest_modification == 0) {
-                    fprintf(stderr, "not copy target...but clean!! %d, %lu / (%u, %u)\n",
-                            buf_page_get_state(&block->page),
-                            (&block->page)->oldest_modification,
-                            (&block->page)->space, (&block->page)->offset);
-                }
-            }
-        }
-        /* end */
 		ut_a(!buf_page_in_file(&block->page));
 
-        UT_LIST_REMOVE(list, buf_pool->free, (&block->page));
-
 		mutex_enter(&block->mutex);
+        
+        fprintf(stderr, "before [%lu] (%u, %u) / %d, %lu\n", buf_pool->instance_no, (&block->page)->space, (&block->page)->offset, (&block->page)->state, UT_LIST_GET_LEN(buf_pool->free));
+        UT_LIST_REMOVE(list, buf_pool->free, (&block->page));
+        fprintf(stderr, "after [%lu] (%u, %u) / %d, %lu\n", buf_pool->instance_no, (&block->page)->space, (&block->page)->offset, (&block->page)->state, UT_LIST_GET_LEN(buf_pool->free));
 
 		buf_block_set_state(block, BUF_BLOCK_READY_FOR_USE);
 		UNIV_MEM_ALLOC(block->frame, UNIV_PAGE_SIZE);
@@ -1381,18 +1361,6 @@ loop:
     buf_pool_mutex_exit(buf_pool);
 
 	buf_pool_mutex_enter(buf_pool);
-
-#if 0
-    if (buf_pool->batch_running) {
-        /* Another thread is running the batch right now. Wait
-           for it to finish. */
-        ib_int64_t  sig_count = os_event_reset(buf_pool->b_event);
-        buf_pool_mutex_exit(buf_pool);
-        
-        os_event_wait_low(buf_pool->b_event, sig_count);
-        goto try_again;
-    }
-#endif
 
     if (buf_pool->flush_running) {
         /* Another thread is running the flush right now. Wait
@@ -1659,13 +1627,6 @@ buf_LRU_remove_block(
 	ut_ad(bpage);
 	ut_ad(buf_pool_mutex_own(buf_pool));
 
-    /* mijin */
-    if (!buf_page_in_file(bpage)) {
-        fprintf(stderr, "%d..(%u, %u)\n",
-                        buf_page_get_state(bpage),
-                        bpage->space, bpage->offset);
-    }
-    /* end */
     ut_a(buf_page_in_file(bpage));
 
 	ut_ad(bpage->in_LRU_list);
@@ -1693,7 +1654,7 @@ buf_LRU_remove_block(
 	}
 
 	/* Remove the block from the LRU list */
-	UT_LIST_REMOVE(LRU, buf_pool->LRU, bpage);
+    UT_LIST_REMOVE(LRU, buf_pool->LRU, bpage);
     if (bpage->copy_target) {
        UT_LIST_REMOVE(list, buf_pool->flush_list, bpage); 
     }
@@ -2266,7 +2227,11 @@ buf_LRU_block_free_non_file_page(
     }
     /* end */
 
+
+    fprintf(stderr, "before insert [%lu] (%u, %u) / %d, %lu\n", buf_pool->instance_no, (&block->page)->space, (&block->page)->offset, (&block->page)->state, UT_LIST_GET_LEN(buf_pool->free));
     UT_LIST_ADD_FIRST(list, buf_pool->free, (&block->page));
+    fprintf(stderr, "after insert [%lu] (%u, %u) / %d, %lu\n", buf_pool->instance_no, (&block->page)->space, (&block->page)->offset, (&block->page)->state, UT_LIST_GET_LEN(buf_pool->free));
+
 	ut_d(block->page.in_free_list = TRUE);
 
 	UNIV_MEM_ASSERT_AND_FREE(block->frame, UNIV_PAGE_SIZE);
