@@ -2146,6 +2146,7 @@ try_again:
                 mutex_exit(&block->mutex);
 
                 buf_pool_mutex_enter(buf_pool);
+                
                 //free(tmp_buf);
                 //free(block);
             }
