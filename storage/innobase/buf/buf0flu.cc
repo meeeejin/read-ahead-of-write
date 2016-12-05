@@ -600,8 +600,12 @@ buf_flush_remove(
 #endif /* UNIV_DEBUG || UNIV_BUF_DEBUG */
 		break;
 	case BUF_BLOCK_FILE_PAGE:
-		UT_LIST_REMOVE(list, buf_pool->flush_list, bpage);
-		break;
+        /* mijin */
+        if (!bpage->copy_target) {
+            UT_LIST_REMOVE(list, buf_pool->flush_list, bpage);
+        }
+		/* end */
+        break;
 	}
 
 	/* If the flush_rbt is active then delete from there as well. */
@@ -2090,8 +2094,8 @@ try_again:
                 goto try_again;
             }
 
-            fprintf(stderr, "start to flush the copy pool [%lu]..\n",
-                            buf_pool->instance_no);
+        //    fprintf(stderr, "start to flush the copy pool [%lu]..\n",
+        //                    buf_pool->instance_no);
 
             buf_pool->flush_running = true;
 
@@ -2128,20 +2132,26 @@ try_again:
                 bpage->buf_pool_index = tmp_buf_pool->instance_no;
 
                 /* FLush the target page. */
-                fprintf(stderr, "before flush %lu = (%u, %u)!\n", i, bpage->space, bpage->offset);
+                //fprintf(stderr, "before flush %lu = (%u, %u)!\n", i, bpage->space, bpage->offset);
+        
+                mutex_enter(&block->mutex);
+                
                 if (buf_flush_page(buf_pool, bpage, BUF_FLUSH_LRU, false)) {
-                    fprintf(stderr, "success flush %lu = (%u, %u)!\n",
-                                    i, bpage->space, bpage->offset);
+                    //fprintf(stderr, "success flush %lu = (%u, %u)!\n",
+                    //                i, bpage->space, bpage->offset);
                     
                     total_flushed++;
                 }
+                
+                mutex_exit(&block->mutex);
 
+                buf_pool_mutex_enter(buf_pool);
                 //free(tmp_buf);
                 //free(block);
             }
 
-            fprintf(stderr, "first free = %lu, total_flushed = %lu\n",
-                            buf_pool->first_free, total_flushed);
+            //fprintf(stderr, "first free = %lu, total_flushed = %lu\n",
+            //                buf_pool->first_free, total_flushed);
             
             buf_pool->first_free = 0;
             buf_pool->need_to_flush_copy_pool = false;

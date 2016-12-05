@@ -3605,8 +3605,10 @@ buf_page_init_for_read(
 	if (zip_size && !unzip && !recv_recovery_is_on()) {
 		block = NULL;
 	} else {
-		block = buf_LRU_get_free_block(buf_pool);
-		ut_ad(block);
+	
+        block = buf_LRU_get_free_block(buf_pool);
+	
+        ut_ad(block);
 		ut_ad(buf_pool_from_block(block) == buf_pool);
 	}
 
@@ -4362,9 +4364,6 @@ corrupt:
                 rw_lock_x_lock(buf_pool->copy_pool_cache_hash_lock);
                 HASH_DELETE(copy_pool_meta_dir_t, hash, buf_pool->copy_pool_cache, fold, entry);
                 rw_lock_x_unlock(buf_pool->copy_pool_cache_hash_lock);
-            
-                fprintf(stderr, "delete from hash table [%lu] = (%u, %u)\n",
-                        buf_pool->instance_no, bpage->space, bpage->offset);
             }
 
             bpage->copy_target = false;
