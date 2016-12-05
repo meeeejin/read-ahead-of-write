@@ -4366,6 +4366,8 @@ corrupt:
                 rw_lock_x_unlock(buf_pool->copy_pool_cache_hash_lock);
             }
 
+            free(entry);
+
             bpage->copy_target = false;
         }
         /* end */
@@ -4389,6 +4391,12 @@ corrupt:
 
 	mutex_exit(buf_page_get_mutex(bpage));
 	buf_pool_mutex_exit(buf_pool);
+
+    /* mijin */
+    if (bpage->copy_target) {
+        free((buf_block_t*) bpage);
+    }
+    /* end */
 
 	return(true);
 }
