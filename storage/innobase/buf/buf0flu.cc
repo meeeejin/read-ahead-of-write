@@ -2094,37 +2094,24 @@ try_again:
                 goto try_again;
             }
 
-        //    fprintf(stderr, "start to flush the copy pool [%lu]..\n",
-        //                    buf_pool->instance_no);
-
             buf_pool->flush_running = true;
 
             for (ulint i = 0; i < buf_pool->first_free; i++) {
                 
-                buf_block_t* block;
+                buf_block_t* block = &buf_pool->copy_block_arr[i];
                 buf_page_t* bpage;
-                byte* tmp_buf;
-
-                /* Initialize a block and page structure. */
-                block = (buf_block_t*) malloc(sizeof(buf_block_t));
-                memset(block, 0, sizeof(buf_block_t));
-                mutex_create(buffer_block_mutex_key, &block->mutex, SYNC_BUF_BLOCK);
-                rw_lock_create(buf_block_lock_key, &block->lock, SYNC_LEVEL_VARYING);  
-
-                assert(!posix_memalign((void **) &tmp_buf, 4096, UNIV_PAGE_SIZE));
                 
                 /* Copy buffer frame from write_buf to tmp_buf. */
-                memcpy(tmp_buf, buf_pool->write_buf + (i * UNIV_PAGE_SIZE), UNIV_PAGE_SIZE);
-                block->frame = tmp_buf;
+                memcpy(block->frame, buf_pool->write_buf + (i * UNIV_PAGE_SIZE), UNIV_PAGE_SIZE);
 
                 /* Extract a page from the buffer frame. */
                 bpage = &block->page;
 
-                bpage->space = mach_read_from_4(tmp_buf + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
-                bpage->offset = mach_read_from_4(tmp_buf + FIL_PAGE_OFFSET);
+                bpage->space = mach_read_from_4(block->frame + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
+                bpage->offset = mach_read_from_4(block->frame + FIL_PAGE_OFFSET);
                
-                bpage->newest_modification = mach_read_from_8(tmp_buf + FIL_PAGE_LSN);
-                bpage->oldest_modification = mach_read_from_8(tmp_buf + FIL_PAGE_LSN);
+                bpage->newest_modification = mach_read_from_8(block->frame + FIL_PAGE_LSN);
+                bpage->oldest_modification = mach_read_from_8(block->frame + FIL_PAGE_LSN);
                 bpage->state = BUF_BLOCK_FILE_PAGE;
                 bpage->copy_target = true;
 
@@ -2132,28 +2119,17 @@ try_again:
                 bpage->buf_pool_index = tmp_buf_pool->instance_no;
 
                 /* FLush the target page. */
-                //fprintf(stderr, "before flush %lu = (%u, %u)!\n", i, bpage->space, bpage->offset);
-        
                 mutex_enter(&block->mutex);
                 
                 if (buf_flush_page(buf_pool, bpage, BUF_FLUSH_LRU, false)) {
-                    //fprintf(stderr, "success flush %lu = (%u, %u)!\n",
-                    //                i, bpage->space, bpage->offset);
-                    
                     total_flushed++;
                 }
                 
                 mutex_exit(&block->mutex);
 
                 buf_pool_mutex_enter(buf_pool);
-                
-                //free(tmp_buf);
-                //free(block);
             }
 
-            //fprintf(stderr, "first free = %lu, total_flushed = %lu\n",
-            //                buf_pool->first_free, total_flushed);
-            
             buf_pool->first_free = 0;
             buf_pool->need_to_flush_copy_pool = false;
 

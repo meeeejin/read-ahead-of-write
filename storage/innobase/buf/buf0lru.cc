@@ -1375,7 +1375,6 @@ loop:
     buf_pool->need_to_flush_copy_pool = true;
     buf_pool->batch_running = true;
 
-    //fprintf(stderr, "start copy process in buffer [%lu]..\n", buf_pool->instance_no);
     for (bpage = UT_LIST_GET_LAST(buf_pool->LRU), scanned = 1;
             bpage != NULL &&  scanned < srv_LRU_scan_depth;
             ++scanned) {
@@ -1413,9 +1412,6 @@ loop:
 
         /* Free the target page from the buffer pool. */
         if (buf_LRU_free_page(bpage, evict_zip)) {
-            //fprintf(stderr, "success free process %lu = (%u, %u)\n",
-            //                first_free, space, offset);
-
             copy_pool_meta_dir_t* new_entry = (copy_pool_meta_dir_t*) malloc(sizeof(copy_pool_meta_dir_t));
 
             new_entry->space = space;
@@ -1441,8 +1437,6 @@ loop:
     buf_pool_mutex_exit(buf_pool);
 
     if (total_copied) {
-        //fprintf(stderr, "total_copied = %lu, failed = %lu\n",
-        //                total_copied, failed);
         goto loop;
     }
     /* end */
