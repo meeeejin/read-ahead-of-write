@@ -1376,9 +1376,10 @@ buf_pool_init_instance(
     buf_pool->b_event = os_event_create();
     buf_pool->f_event = os_event_create();
 
-    buf_pool->total_entry = 7200;
+    buf_pool->total_entry = 2400;
     buf_pool->first_free = 0;
 
+    /* Initialize write buffer for copy pool. */
     buf_pool->write_buf_unaligned = static_cast<byte*>(
             ut_malloc((1 + buf_pool->total_entry) * UNIV_PAGE_SIZE));
 
@@ -1386,6 +1387,7 @@ buf_pool_init_instance(
             ut_align(buf_pool->write_buf_unaligned,
                 UNIV_PAGE_SIZE));
 
+    /* Initialize hash structure for copy pool. */
     buf_pool->copy_pool_cache = ha_create(2 * buf_pool->total_entry,
             srv_n_page_hash_locks,
             MEM_HEAP_FOR_PAGE_HASH,
@@ -1393,6 +1395,16 @@ buf_pool_init_instance(
 
     buf_pool->copy_pool_cache_hash_lock = static_cast<rw_lock_t*>(mem_alloc(sizeof(rw_lock_t)));
     rw_lock_create(buf_block_lock_key, buf_pool->copy_pool_cache_hash_lock, SYNC_LEVEL_VARYING);
+    
+    /* Initialize a block and page structure. */
+    buf_pool->copy_block_arr = (buf_block_t*) malloc(sizeof(buf_block_t) * buf_pool->total_entry);
+    for (i = 0; i < buf_pool->total_entry; i++) {
+        memset(&buf_pool->copy_block_arr[i], 0, sizeof(buf_block_t));
+        mutex_create(buffer_block_mutex_key, &(buf_pool->copy_block_arr[i]).mutex, SYNC_BUF_BLOCK);
+        rw_lock_create(buf_block_lock_key, &(buf_pool->copy_block_arr[i]).lock, SYNC_LEVEL_VARYING);
+    
+        assert(!posix_memalign((void **) &(buf_pool->copy_block_arr[i]).frame, 4096, UNIV_PAGE_SIZE));
+    }
     /* end */
 
 	/* All fields are initialized by mem_zalloc(). */

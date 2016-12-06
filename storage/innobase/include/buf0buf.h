@@ -2008,6 +2008,8 @@ struct buf_pool_t{
     
     hash_table_t*   copy_pool_cache;
     rw_lock_t*      copy_pool_cache_hash_lock;
+    
+    buf_block_t*    copy_block_arr;
     /* end */
 #if BUF_BUDDY_LOW > UNIV_ZIP_SIZE_MIN
 # error "BUF_BUDDY_LOW > UNIV_ZIP_SIZE_MIN"

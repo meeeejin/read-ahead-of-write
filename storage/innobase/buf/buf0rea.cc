@@ -182,7 +182,6 @@ buf_read_page_low(
     if (buf_pool->need_to_flush_copy_pool) {
         ulint fold;
         copy_pool_meta_dir_t* entry;
-        bool search_check = false;
 
         fold = buf_page_address_fold(space, offset);
 
@@ -195,15 +194,8 @@ check:
         rw_lock_s_unlock(buf_pool->copy_pool_cache_hash_lock);
 
         if (entry) {
-            search_check = true;
-    //        fprintf(stderr, "Need to flush copy pool [%lu]..(%u, %u)\n",
-    //                        buf_pool->instance_no,
-    //                        entry->space, entry->offset);
-
             os_thread_sleep(100000);
             goto check;
-        } else if (search_check) {
-            os_thread_sleep(10000);
         }
     }
     /* end */
