@@ -2118,7 +2118,7 @@ try_again:
                 buf_pool_t* tmp_buf_pool = buf_pool_get(bpage->space, bpage->offset);
                 bpage->buf_pool_index = tmp_buf_pool->instance_no;
 
-                /* FLush the target page. */
+                /* Flush the target page. */
                 mutex_enter(&block->mutex);
                 
                 if (buf_flush_page(buf_pool, bpage, BUF_FLUSH_LRU, false)) {
@@ -2135,6 +2135,12 @@ try_again:
 
             buf_pool->flush_running = false;
             os_event_set(buf_pool->f_event);
+
+            for (ulint i = 0; i < buf_pool->first_free; i++) {
+                buf_block_t* block = &buf_pool->copy_block_arr[i];
+
+                memset(block->frame, 0, UNIV_PAGE_SIZE);
+            }
         }
 
 		buf_pool_mutex_exit(buf_pool);
