@@ -1462,6 +1462,20 @@ buf_pool_free_instance(
 	ha_clear(buf_pool->page_hash);
 	hash_table_free(buf_pool->page_hash);
 	hash_table_free(buf_pool->zip_hash);
+
+    /* mijin */
+    os_event_free(buf_pool->b_event);
+    os_event_free(buf_pool->f_event);
+    
+    ut_free(buf_pool->write_buf_unaligned);
+    buf_pool->write_buf_unaligned = NULL;
+    
+    mem_free(buf_pool->copy_block_arr);
+    buf_pool->copy_block_arr = NULL;
+    
+	ha_clear(buf_pool->copy_pool_cache);
+	hash_table_free(buf_pool->copy_pool_cache);
+    /* end */
 }
 
 /********************************************************************//**
@@ -4376,11 +4390,9 @@ corrupt:
                 rw_lock_x_lock(buf_pool->copy_pool_cache_hash_lock);
                 HASH_DELETE(copy_pool_meta_dir_t, hash, buf_pool->copy_pool_cache, fold, entry);
                 rw_lock_x_unlock(buf_pool->copy_pool_cache_hash_lock);
+            
+                free(entry);
             }
-
-            free(entry);
-
-            bpage->copy_target = false;
         }
         /* end */
 
@@ -4403,12 +4415,6 @@ corrupt:
 
 	mutex_exit(buf_page_get_mutex(bpage));
 	buf_pool_mutex_exit(buf_pool);
-
-    /* mijin */
-    if (bpage->copy_target) {
-        free((buf_block_t*) bpage);
-    }
-    /* end */
 
 	return(true);
 }
