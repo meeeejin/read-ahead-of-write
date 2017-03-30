@@ -282,8 +282,8 @@ trx_rseg_create_instance(
 			space = trx_sysf_rseg_get_space(sys_header, i, mtr);
 
 			zip_size = space ? fil_space_get_zip_size(space) : 0;
-
-			rseg = trx_rseg_mem_create(
+			
+            rseg = trx_rseg_mem_create(
 				i, space, zip_size, page_no, ib_bh, mtr);
 
 			ut_a(rseg->id == i);

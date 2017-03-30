@@ -2354,7 +2354,7 @@ files_checked:
 		/* Stamp the LSN to the data files. */
 		fil_write_flushed_lsn_to_data_files(max_flushed_lsn, 0);
 
-		fil_flush_file_spaces(FIL_TABLESPACE);
+		fil_flush_file_spaces(FIL_TABLESPACE, 0);
 
 		create_log_files_rename(logfilename, dirnamelen,
 					max_flushed_lsn, logfile0);
@@ -2541,7 +2541,7 @@ files_checked:
 			fil_write_flushed_lsn_to_data_files(
 				max_flushed_lsn, 0);
 
-			fil_flush_file_spaces(FIL_TABLESPACE);
+			fil_flush_file_spaces(FIL_TABLESPACE, 0);
 
 			RECOVERY_CRASH(4);
 

@@ -1373,10 +1373,18 @@ buf_pool_init_instance(
     buf_pool->batch_running = false;
     buf_pool->flush_running = false;
     
+    buf_pool->need_to_call_fsync = false;
+    
+    /* FIXME: 425 is the number of data files of SysBench tests */
+    buf_pool->space_ids = static_cast<ulint*>(
+            mem_alloc(430 * sizeof(ulint)));
+    memset(buf_pool->space_ids, 0, 430 * sizeof(ulint));
+
     buf_pool->b_event = os_event_create();
     buf_pool->f_event = os_event_create();
 
-    buf_pool->total_entry = 2400;
+    /* FIXME: auto increased total_entry?..why 4 times?.. */
+    buf_pool->total_entry = srv_LRU_scan_depth * 4;
     buf_pool->first_free = 0;
 
     /* Initialize write buffer for copy pool. */
@@ -1472,7 +1480,10 @@ buf_pool_free_instance(
     
     mem_free(buf_pool->copy_block_arr);
     buf_pool->copy_block_arr = NULL;
-    
+
+    mem_free(buf_pool->space_ids);
+    buf_pool->space_ids = NULL;
+
 	ha_clear(buf_pool->copy_pool_cache);
 	hash_table_free(buf_pool->copy_pool_cache);
     /* end */

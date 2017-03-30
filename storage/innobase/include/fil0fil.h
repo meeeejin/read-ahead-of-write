@@ -793,7 +793,11 @@ UNIV_INTERN
 void
 fil_flush_file_spaces(
 /*==================*/
-	ulint	purpose);	/*!< in: FIL_TABLESPACE, FIL_LOG */
+	ulint	purpose,	    /*!< in: FIL_TABLESPACE, FIL_LOG */
+    /* mijin*/
+    buf_pool_t* buf_pool);   /*!< in: buffer pool instance */
+    /* end */
+
 /******************************************************************//**
 Checks the consistency of the tablespace cache.
 @return	TRUE if ok */

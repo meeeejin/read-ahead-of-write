@@ -1996,7 +1996,10 @@ struct buf_pool_t{
     ibool       need_to_flush_copy_pool;
     ibool       batch_running;
     ibool       flush_running;
-    
+
+    ibool       need_to_call_fsync;
+    ulint*      space_ids;
+
     os_event_t  b_event;
     os_event_t  f_event;
 

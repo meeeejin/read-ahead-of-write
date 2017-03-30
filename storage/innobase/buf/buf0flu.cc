@@ -2082,7 +2082,14 @@ buf_flush_LRU_tail(void)
         /* mijin */
 try_again:
         buf_pool_mutex_enter(buf_pool);
-        
+       
+        bool no_need_to_flush_lru_list = buf_pool->need_to_flush_copy_pool;
+        /*if (no_need_to_flush_lru_list) {
+            fprintf(stderr, "we do not need to flush lru list!\n");
+        } else {
+            fprintf(stderr, "we need to flush lru list!\n");
+        }*/
+
         if (buf_pool->need_to_flush_copy_pool) {
             if (buf_pool->batch_running) {
                 /* Another thread is running the batch right now. Wait
@@ -2118,6 +2125,10 @@ try_again:
                 buf_pool_t* tmp_buf_pool = buf_pool_get(bpage->space, bpage->offset);
                 bpage->buf_pool_index = tmp_buf_pool->instance_no;
 
+                if ((i + 1) == buf_pool->first_free) {
+                    buf_pool->need_to_call_fsync = true;
+                }
+
                 /* Flush the target page. */
                 mutex_enter(&block->mutex);
                 
@@ -2146,44 +2157,54 @@ try_again:
 		buf_pool_mutex_exit(buf_pool);
         /* end */
 
-		/* srv_LRU_scan_depth can be arbitrarily large value.
-		We cap it with current LRU size. */
-		buf_pool_mutex_enter(buf_pool);
-		scan_depth = UT_LIST_GET_LEN(buf_pool->LRU);
-		buf_pool_mutex_exit(buf_pool);
+        /* mijin */
+        if (!no_need_to_flush_lru_list) {
+        /* end */
+            /* srv_LRU_scan_depth can be arbitrarily large value.
+               We cap it with current LRU size. */
+            buf_pool_mutex_enter(buf_pool);
+            scan_depth = UT_LIST_GET_LEN(buf_pool->LRU);
+            buf_pool_mutex_exit(buf_pool);
 
-		scan_depth = ut_min(srv_LRU_scan_depth, scan_depth);
+            scan_depth = ut_min(srv_LRU_scan_depth, scan_depth);
 
-		/* We divide LRU flush into smaller chunks because
-		there may be user threads waiting for the flush to
-		end in buf_LRU_get_free_block(). */
-		for (ulint j = 0;
-		     j < scan_depth;
-		     j += PAGE_CLEANER_LRU_BATCH_CHUNK_SIZE) {
+            /* We divide LRU flush into smaller chunks because
+               there may be user threads waiting for the flush to
+               end in buf_LRU_get_free_block(). */
+            for (ulint j = 0;
+                    j < scan_depth;
+                    j += PAGE_CLEANER_LRU_BATCH_CHUNK_SIZE) {
 
-            ulint	n_flushed = 0;
+                ulint	n_flushed = 0;
 
-			/* Currently page_cleaner is the only thread
-			that can trigger an LRU flush. It is possible
-			that a batch triggered during last iteration is
-			still running, */
-			if (buf_flush_LRU(buf_pool,
-					  PAGE_CLEANER_LRU_BATCH_CHUNK_SIZE,
-					  &n_flushed)) {
+                /* mijin */
+                if ((j + PAGE_CLEANER_LRU_BATCH_CHUNK_SIZE) >= scan_depth) {
+                    buf_pool->need_to_call_fsync = true;
+                }
+                /* end */
 
-				/* Allowed only one batch per
-				buffer pool instance. */
-				buf_flush_wait_batch_end(
-					buf_pool, BUF_FLUSH_LRU);
-			}
+                /* Currently page_cleaner is the only thread
+                   that can trigger an LRU flush. It is possible
+                   that a batch triggered during last iteration is
+                   still running, */
+                if (buf_flush_LRU(buf_pool,
+                            PAGE_CLEANER_LRU_BATCH_CHUNK_SIZE,
+                            &n_flushed)) {
 
-			if (n_flushed) {
-				total_flushed += n_flushed;
-			} else {
-				/* Nothing to flush */
-				break;
-			}
-		}
+                    /* Allowed only one batch per
+                       buffer pool instance. */
+                    buf_flush_wait_batch_end(
+                            buf_pool, BUF_FLUSH_LRU);
+                }
+
+                if (n_flushed) {
+                    total_flushed += n_flushed;
+                } else {
+                    /* Nothing to flush */
+                    break;
+                }
+            }
+        }
 	}
 
 	if (total_flushed) {

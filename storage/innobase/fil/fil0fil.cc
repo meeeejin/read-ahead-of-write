@@ -1060,7 +1060,7 @@ retry:
 
 		/* Flush tablespaces so that we can close modified
 		files in the LRU list */
-		fil_flush_file_spaces(FIL_TABLESPACE);
+		fil_flush_file_spaces(FIL_TABLESPACE, 0);
 
 		os_thread_sleep(20000);
 
@@ -1129,7 +1129,7 @@ close_more:
 	/* Flush tablespaces so that we can close modified files in the LRU
 	list */
 
-	fil_flush_file_spaces(FIL_TABLESPACE);
+	fil_flush_file_spaces(FIL_TABLESPACE, 0);
 
 	count++;
 
@@ -5940,7 +5940,10 @@ UNIV_INTERN
 void
 fil_flush_file_spaces(
 /*==================*/
-	ulint	purpose)	/*!< in: FIL_TABLESPACE, FIL_LOG */
+	ulint	purpose,	    /*!< in: FIL_TABLESPACE, FIL_LOG */
+    /* mijin */
+    buf_pool_t* buf_pool)   /*!< in: buffer pool instance */ 
+    /* end */
 {
 	fil_space_t*	space;
 	ulint*		space_ids;
@@ -5956,35 +5959,70 @@ fil_flush_file_spaces(
 		return;
 	}
 
-	/* Assemble a list of space ids to flush.  Previously, we
-	traversed fil_system->unflushed_spaces and called UT_LIST_GET_NEXT()
-	on a space that was just removed from the list by fil_flush().
-	Thus, the space could be dropped and the memory overwritten. */
-	space_ids = static_cast<ulint*>(
-		mem_alloc(n_space_ids * sizeof *space_ids));
+    /* mijin */
+    /* FIXME: I modified all fil_flush_file_spaces() function
+     by adding a new parameter, buf_pool_t* buf_pool. */
+    if (buf_pool) {
+        /* RAW case */
+        for (space = UT_LIST_GET_FIRST(fil_system->unflushed_spaces);
+                space;
+                space = UT_LIST_GET_NEXT(unflushed_spaces, space)) {
 
-	n_space_ids = 0;
+            if (space->purpose == purpose && !space->stop_new_ops) {
+                buf_pool->space_ids[space->id] = 1;
+            }
+        }
 
-	for (space = UT_LIST_GET_FIRST(fil_system->unflushed_spaces);
-	     space;
-	     space = UT_LIST_GET_NEXT(unflushed_spaces, space)) {
+        mutex_exit(&fil_system->mutex);
 
-		if (space->purpose == purpose && !space->stop_new_ops) {
+        n_space_ids = UT_LIST_GET_LEN(fil_system->space_list);
+        
+        if (buf_pool->need_to_call_fsync) {
 
-			space_ids[n_space_ids++] = space->id;
-		}
-	}
+            /* Flush the spaces.  It will not hurt to call fil_flush() on
+               a non-existing space id. */
+            for (i = 0; i < n_space_ids; i++) {
+                if (buf_pool->space_ids[i] == 1) {
+                    fil_flush(i);
+                }
+            }
 
-	mutex_exit(&fil_system->mutex);
+            buf_pool->need_to_call_fsync = false;
+        } else if (n_space_ids == 1 && buf_pool->space_ids[0] == 1) {
+            /* We need to flush system tablespace. */
+            fil_flush(0);
+        }
 
-	/* Flush the spaces.  It will not hurt to call fil_flush() on
-	a non-existing space id. */
-	for (i = 0; i < n_space_ids; i++) {
+        memset(buf_pool->space_ids, 0, 430 * sizeof(ulint));
+    } else {
+        /* Assemble a list of space ids to flush.  Previously, we
+           traversed fil_system->unflushed_spaces and called UT_LIST_GET_NEXT()
+           on a space that was just removed from the list by fil_flush().
+           Thus, the space could be dropped and the memory overwritten. */
+        space_ids = static_cast<ulint*>(
+                mem_alloc(n_space_ids * sizeof *space_ids));
 
-		fil_flush(space_ids[i]);
-	}
+        n_space_ids = 0;
 
-	mem_free(space_ids);
+        for (space = UT_LIST_GET_FIRST(fil_system->unflushed_spaces);
+                space;
+                space = UT_LIST_GET_NEXT(unflushed_spaces, space)) {
+
+            if (space->purpose == purpose && !space->stop_new_ops) {
+                space_ids[n_space_ids++] = space->id;
+            }
+        }
+
+        mutex_exit(&fil_system->mutex);
+
+        /* Flush the spaces.  It will not hurt to call fil_flush() on
+           a non-existing space id. */
+        for (i = 0; i < n_space_ids; i++) {
+            fil_flush(space_ids[i]);
+        }
+
+        mem_free(space_ids);
+    }
 }
 
 /** Functor to validate the space list. */
