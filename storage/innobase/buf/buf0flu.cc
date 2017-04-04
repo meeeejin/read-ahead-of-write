@@ -2084,10 +2084,11 @@ try_again:
         buf_pool_mutex_enter(buf_pool);
        
         bool no_need_to_flush_lru_list = buf_pool->need_to_flush_copy_pool;
+        bool last = false;
         /*if (no_need_to_flush_lru_list) {
-            fprintf(stderr, "we do not need to flush lru list!\n");
+            fprintf(stderr, "we do not need to flush lru list! %lu\n", buf_pool->instance_no);
         } else {
-            fprintf(stderr, "we need to flush lru list!\n");
+            fprintf(stderr, "we need to flush lru list! %lu\n", buf_pool->instance_no);
         }*/
 
         if (buf_pool->need_to_flush_copy_pool) {
@@ -2103,13 +2104,13 @@ try_again:
 
             buf_pool->flush_running = true;
 
-            for (ulint i = 0; i < buf_pool->first_free; i++) {
+            for (ulint j = 0; j < buf_pool->first_free; j++) {
                 
-                buf_block_t* block = &buf_pool->copy_block_arr[i];
+                buf_block_t* block = &buf_pool->copy_block_arr[j];
                 buf_page_t* bpage;
                 
                 /* Copy buffer frame from write_buf to tmp_buf. */
-                memcpy(block->frame, buf_pool->write_buf + (i * UNIV_PAGE_SIZE), UNIV_PAGE_SIZE);
+                memcpy(block->frame, buf_pool->write_buf + (j * UNIV_PAGE_SIZE), UNIV_PAGE_SIZE);
 
                 /* Extract a page from the buffer frame. */
                 bpage = &block->page;
@@ -2125,41 +2126,36 @@ try_again:
                 buf_pool_t* tmp_buf_pool = buf_pool_get(bpage->space, bpage->offset);
                 bpage->buf_pool_index = tmp_buf_pool->instance_no;
 
-                if ((i + 1) == buf_pool->first_free) {
+                if ((j + 1) == buf_pool->first_free) {
                     buf_pool->need_to_call_fsync = true;
+                    last = true;
                 }
 
                 /* Flush the target page. */
                 mutex_enter(&block->mutex);
-                
+             
                 if (buf_flush_page(buf_pool, bpage, BUF_FLUSH_LRU, false)) {
                     total_flushed++;
                 }
-                
-                mutex_exit(&block->mutex);
 
-                buf_pool_mutex_enter(buf_pool);
-            }
-
-            buf_pool->first_free = 0;
-            buf_pool->need_to_flush_copy_pool = false;
-
-            buf_pool->flush_running = false;
-            os_event_set(buf_pool->f_event);
-
-            for (ulint i = 0; i < buf_pool->first_free; i++) {
-                buf_block_t* block = &buf_pool->copy_block_arr[i];
-
-                memset(block->frame, 0, UNIV_PAGE_SIZE);
+                if (!last) {
+                    mutex_exit(&block->mutex);
+                    buf_pool_mutex_enter(buf_pool);
+                } else {
+                    buf_dblwr_flush_buffered_writes();
+                    
+                    last = false;
+                }
             }
         }
 
-		buf_pool_mutex_exit(buf_pool);
         /* end */
 
         /* mijin */
         if (!no_need_to_flush_lru_list) {
+		    buf_pool_mutex_exit(buf_pool);
         /* end */
+            
             /* srv_LRU_scan_depth can be arbitrarily large value.
                We cap it with current LRU size. */
             buf_pool_mutex_enter(buf_pool);

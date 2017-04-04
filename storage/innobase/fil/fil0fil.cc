@@ -5960,8 +5960,8 @@ fil_flush_file_spaces(
 	}
 
     /* mijin */
-    /* FIXME: I modified all fil_flush_file_spaces() function
-     by adding a new parameter, buf_pool_t* buf_pool. */
+    /* FIXME: I modified all fil_flush_file_spaces() functions
+    by adding a new parameter, buf_pool_t* buf_pool. */
     if (buf_pool) {
         /* RAW case */
         for (space = UT_LIST_GET_FIRST(fil_system->unflushed_spaces);
@@ -5978,9 +5978,7 @@ fil_flush_file_spaces(
         n_space_ids = UT_LIST_GET_LEN(fil_system->space_list);
         
         if (buf_pool->need_to_call_fsync) {
-
-            /* Flush the spaces.  It will not hurt to call fil_flush() on
-               a non-existing space id. */
+            /* Group fsync */
             for (i = 0; i < n_space_ids; i++) {
                 if (buf_pool->space_ids[i] == 1) {
                     fil_flush(i);

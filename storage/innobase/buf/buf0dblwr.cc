@@ -654,8 +654,24 @@ buf_dblwr_update(
 			to the disk. */
             
             /* mijin */
-            buf_pool_t* tmp_buf_pool = buf_pool_get(bpage->space, bpage->offset);
-			fil_flush_file_spaces(FIL_TABLESPACE, tmp_buf_pool);
+            buf_pool_t* buf_pool = buf_pool_get(bpage->space, bpage->offset);
+			
+            if (buf_pool->need_to_call_fsync && buf_pool->flush_running) {
+                mutex_exit(&((buf_block_t*) bpage)->mutex);
+                
+                for (ulint i = 0; i < buf_pool->first_free; i++) {
+                    buf_block_t* block = &buf_pool->copy_block_arr[i];
+                    memset(block->frame, 0, UNIV_PAGE_SIZE);
+                }
+
+                buf_pool->first_free = 0;
+                buf_pool->need_to_flush_copy_pool = false;
+
+                buf_pool->flush_running = false;
+                os_event_set(buf_pool->f_event);
+            }
+            
+            fil_flush_file_spaces(FIL_TABLESPACE, buf_pool);
 			/* end */
 
             mutex_enter(&buf_dblwr->mutex);
