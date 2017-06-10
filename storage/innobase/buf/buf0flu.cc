@@ -2081,6 +2081,7 @@ buf_flush_LRU_tail(void)
 
         /* mijin */
 try_again:
+        //fprintf(stderr, "start lru_tail: %lu\n", buf_pool->instance_no);
         buf_pool_mutex_enter(buf_pool);
        
         bool no_need_to_flush_lru_list = buf_pool->need_to_flush_copy_pool;
@@ -2093,6 +2094,7 @@ try_again:
 
         if (buf_pool->need_to_flush_copy_pool) {
             if (buf_pool->batch_running) {
+              //  fprintf(stderr, "lru_tail *\n");
                 /* Another thread is running the batch right now. Wait
                    for it to finish. */
                 ib_int64_t  sig_count = os_event_reset(buf_pool->b_event);
@@ -2102,7 +2104,10 @@ try_again:
                 goto try_again;
             }
 
+            //    fprintf(stderr, "start flush lru_tail **: %lu, %lu\n",
+              //                  buf_pool->instance_no, buf_pool->first_free);
             buf_pool->flush_running = true;
+            buf_pool->need_to_call_fsync = false;
 
             for (ulint j = 0; j < buf_pool->first_free; j++) {
                 
@@ -2129,9 +2134,12 @@ try_again:
                 if ((j + 1) == buf_pool->first_free) {
                     buf_pool->need_to_call_fsync = true;
                     last = true;
+                    //fprintf(stderr, "need to call fsync %lu\n",
+                    //        buf_pool->instance_no);
                 }
 
                 /* Flush the target page. */
+                //fprintf(stderr, "lru_tail ***: %lu\n", buf_pool->instance_no);
                 mutex_enter(&block->mutex);
              
                 if (buf_flush_page(buf_pool, bpage, BUF_FLUSH_LRU, false)) {
@@ -2139,14 +2147,19 @@ try_again:
                 }
 
                 if (!last) {
+                //fprintf(stderr, "lru_tail ****: %lu, %lu, %lu\n",
+                //        buf_pool->instance_no,j,  buf_pool->first_free);
                     mutex_exit(&block->mutex);
+                //    fprintf(stderr, "lru_tail2: %lu\n", buf_pool->instance_no);
                     buf_pool_mutex_enter(buf_pool);
                 } else {
+                //fprintf(stderr, "lru_tail *****: %lu\n", buf_pool->instance_no);
                     buf_dblwr_flush_buffered_writes();
-                    
+                //fprintf(stderr, "lru_tail ******: %lu\n", buf_pool->instance_no);
                     last = false;
                 }
             }
+            //fprintf(stderr, "enf of the %lu\n", buf_pool->instance_no);
         }
 
         /* end */

@@ -1347,6 +1347,7 @@ loop:
 	}
 
     /* mijin */
+    //fprintf(stderr, "get_block: %lu\n", buf_pool->instance_no);
     buf_pool_mutex_enter(buf_pool);
 
     if (buf_pool->batch_running) {
@@ -1401,7 +1402,9 @@ loop:
 
         first_free = buf_pool->first_free;
         buf_pool->first_free++;
-      
+    
+        //log_write_up_to(bpage->newest_modification, LOG_WAIT_ALL_GROUPS, TRUE);
+
         /* Copy the buffer frame into the copy pool. */
         memcpy(buf_pool->write_buf
                 + UNIV_PAGE_SIZE * first_free,
@@ -1435,6 +1438,7 @@ loop:
     os_event_set(buf_pool->b_event);
 
     buf_pool_mutex_exit(buf_pool);
+    //fprintf(stderr, "exit get block: %lu\n", buf_pool->instance_no);
 
     if (total_copied) {
         goto loop;

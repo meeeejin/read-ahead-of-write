@@ -4337,6 +4337,9 @@ corrupt:
 		}
 	}
 
+    /* mijin */
+    //fprintf(stderr, "io_complete: %lu\n", buf_pool->instance_no);
+    /* end */
 	buf_pool_mutex_enter(buf_pool);
 	mutex_enter(buf_page_get_mutex(bpage));
 

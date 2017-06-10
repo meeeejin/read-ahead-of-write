@@ -664,15 +664,30 @@ buf_dblwr_update(
                     memset(block->frame, 0, UNIV_PAGE_SIZE);
                 }
 
+                /*fprintf(stderr, "dwb buffer mutex enter %lu\n",
+                        buf_pool->instance_no);
+                buf_pool_mutex_enter(buf_pool);
+*/
                 buf_pool->first_free = 0;
                 buf_pool->need_to_flush_copy_pool = false;
 
                 buf_pool->flush_running = false;
                 os_event_set(buf_pool->f_event);
-            }
+               
+  /*              fprintf(stderr, "dwb buffer mutex exit %lu\n",
+                        buf_pool->instance_no);
+                buf_pool_mutex_exit(buf_pool);
+    */        }
             
+            /*fprintf(stderr, "dwb fynsc before %lu\n",
+                        buf_pool->instance_no);
+*/
             fil_flush_file_spaces(FIL_TABLESPACE, buf_pool);
-			/* end */
+			
+  /*          fprintf(stderr, "dwb fsync after %lu\n",
+                        buf_pool->instance_no);
+    */        
+            /* end */
 
             mutex_enter(&buf_dblwr->mutex);
 

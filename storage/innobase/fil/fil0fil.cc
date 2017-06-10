@@ -5993,6 +5993,7 @@ fil_flush_file_spaces(
 
         memset(buf_pool->space_ids, 0, 430 * sizeof(ulint));
     } else {
+        /* end */
         /* Assemble a list of space ids to flush.  Previously, we
            traversed fil_system->unflushed_spaces and called UT_LIST_GET_NEXT()
            on a space that was just removed from the list by fil_flush().
