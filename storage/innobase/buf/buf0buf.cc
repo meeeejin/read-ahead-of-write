@@ -1376,7 +1376,7 @@ buf_pool_init_instance(
     buf_pool->b_event = os_event_create();
     buf_pool->f_event = os_event_create();
 
-    buf_pool->total_entry = 2400;
+    buf_pool->total_entry = srv_LRU_scan_depth * 4;
     buf_pool->first_free = 0;
 
     /* Initialize write buffer for copy pool. */
