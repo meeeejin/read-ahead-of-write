@@ -1052,8 +1052,12 @@ buf_flush_page(
 
         ++buf_pool->n_flush[flush_type];
 
-        mutex_exit(block_mutex);
-        buf_pool_mutex_exit(buf_pool);
+        /* mijin */
+        if (!bpage->copy_target) {
+            mutex_exit(block_mutex);
+            buf_pool_mutex_exit(buf_pool);
+        }
+        /* end */
 
         if (flush_type == BUF_FLUSH_LIST
                 && is_uncompressed
@@ -2060,6 +2064,68 @@ buf_flush_single_page_from_LRU(
 	return(freed);
 }
 
+/* mijin */
+static
+ulint
+buf_flush_copy_pool(
+/*================*/
+    buf_pool_t* buf_pool,   /*!< in/out: buffer pool instance */
+    ulint*      n_flushed)
+{
+    bool last = false;
+
+    buf_pool->flush_running = true;
+    buf_pool_mutex_exit(buf_pool);
+
+    mutex_enter(&buf_pool->copy_pool_mutex);
+
+    for (ulint j = 0; j < buf_pool->first_free; j++) {
+
+        buf_block_t* block = &buf_pool->copy_block_arr[j];
+        buf_page_t* bpage;
+
+        /* Copy buffer frame from write_buf to tmp_buf. */
+        memcpy(block->frame, buf_pool->write_buf + (j * UNIV_PAGE_SIZE), UNIV_PAGE_SIZE);
+
+        /* Extract a page from the buffer frame. */
+        bpage = &block->page;
+
+        bpage->space = mach_read_from_4(block->frame + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
+        bpage->offset = mach_read_from_4(block->frame + FIL_PAGE_OFFSET);
+
+        bpage->newest_modification = mach_read_from_8(block->frame + FIL_PAGE_LSN);
+        bpage->oldest_modification = mach_read_from_8(block->frame + FIL_PAGE_LSN);
+        bpage->state = BUF_BLOCK_FILE_PAGE;
+        bpage->copy_target = true;
+
+        buf_pool_t* tmp_buf_pool = buf_pool_get(bpage->space, bpage->offset);
+        bpage->buf_pool_index = tmp_buf_pool->instance_no;
+
+        if ((j + 1) == buf_pool->first_free) {
+            last = true;
+        }
+
+        /* Flush the target page. */
+        if (buf_flush_page(buf_pool, bpage, BUF_FLUSH_LRU, false)) {
+            n_flushed++;
+        }
+
+        if (last) {
+            buf_dblwr_flush_buffered_writes();
+            last = false;
+        }
+    }
+
+    buf_pool->first_free = 0;
+    buf_pool->need_to_flush_copy_pool = false;
+
+    buf_pool->flush_running = false;
+    os_event_set(buf_pool->f_event);
+
+    mutex_exit(&buf_pool->copy_pool_mutex);
+}
+/* end */
+
 /*********************************************************************//**
 Clears up tail of the LRU lists:
 * Put replaceable pages at the tail of LRU to the free list
@@ -2080,14 +2146,17 @@ buf_flush_LRU_tail(void)
 		ulint		scan_depth;
 
         /* mijin */
+        ulint n_flushed = 0;
 try_again:
         buf_pool_mutex_enter(buf_pool);
         
         bool no_need_to_flush_lru_list = buf_pool->need_to_flush_copy_pool;
-        bool last = false;
 
         if (no_need_to_flush_lru_list) {
+            /* RAW mode*/
+
             if (buf_pool->batch_running) {
+                fprintf(stderr, "000\n");
                 /* Another thread is running the batch right now. Wait
                    for it to finish. */
                 ib_int64_t  sig_count = os_event_reset(buf_pool->b_event);
@@ -2097,105 +2166,118 @@ try_again:
                 goto try_again;
             }
 
-            buf_pool->flush_running = true;
+            buf_flush_copy_pool(buf_pool, &n_flushed);            
+            
+            fprintf(stderr, "raw mode %lu: %lu\n", buf_pool->instance_no, n_flushed);
+        } else {
+            /* WAR mode */
 
-            for (ulint j = 0; j < buf_pool->first_free; j++) {
-                
-                buf_block_t* block = &buf_pool->copy_block_arr[j];
-                buf_page_t* bpage;
-                
-                /* Copy buffer frame from write_buf to tmp_buf. */
-                memcpy(block->frame, buf_pool->write_buf + (j * UNIV_PAGE_SIZE), UNIV_PAGE_SIZE);
-
-                /* Extract a page from the buffer frame. */
-                bpage = &block->page;
-
-                bpage->space = mach_read_from_4(block->frame + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
-                bpage->offset = mach_read_from_4(block->frame + FIL_PAGE_OFFSET);
-               
-                bpage->newest_modification = mach_read_from_8(block->frame + FIL_PAGE_LSN);
-                bpage->oldest_modification = mach_read_from_8(block->frame + FIL_PAGE_LSN);
-                bpage->state = BUF_BLOCK_FILE_PAGE;
-                bpage->copy_target = true;
-
-                buf_pool_t* tmp_buf_pool = buf_pool_get(bpage->space, bpage->offset);
-                bpage->buf_pool_index = tmp_buf_pool->instance_no;
-
-                if ((j + 1) == buf_pool->first_free) {
-                    last = true;
-                }
-
-                /* Flush the target page. */
-                mutex_enter(&block->mutex);
-                
-                if (buf_flush_page(buf_pool, bpage, BUF_FLUSH_LRU, false)) {
-                    total_flushed++;
-                } else {
-                    mutex_exit(&block->mutex);
-                }
-                
-                if (last) {
-                    buf_dblwr_flush_buffered_writes();
-                    last = false;
-                }
-                
-                buf_pool_mutex_enter(buf_pool);
+            if (buf_pool->batch_running) {
+                fprintf(stderr, "111\n");
+                buf_pool_mutex_exit(buf_pool);
+                goto try_again;
             }
 
-            /*for (ulint k = 0; k < buf_pool->first_free; k++) {
-                buf_block_t* block = &buf_pool->copy_block_arr[k];
-                memset(block->frame, 0, UNIV_PAGE_SIZE);
-            }*/
+            if (buf_pool->flush_running) {
+                fprintf(stderr, "222\n");
+                /* Another thread is running the flush right now. Wait
+                   for it to finish. */
+                ib_int64_t  sig_count = os_event_reset(buf_pool->f_event);
+                buf_pool_mutex_exit(buf_pool);
 
-            buf_pool->first_free = 0;
-            buf_pool->need_to_flush_copy_pool = false;
+                os_event_wait_low(buf_pool->f_event, sig_count);
+                goto try_again;
+            }
 
-            buf_pool->flush_running = false;
-            os_event_set(buf_pool->f_event);
+            buf_page_t* bpage;
+            ulint scanned;
+            ulint total_copied = 0;
+            ulint failed = 0;
+            ulint first_free;
+            buf_page_t* prev_bpage;
+            bool    evict_zip;
 
-            buf_pool_mutex_exit(buf_pool);
-        } else {
-        /* end */
+            buf_pool->need_to_flush_copy_pool = true;
+            buf_pool->batch_running = true;
+            buf_pool->war_running = true;
 
-            /* srv_LRU_scan_depth can be arbitrarily large value.
-               We cap it with current LRU size. */
-            //buf_pool_mutex_enter(buf_pool);
-            scan_depth = UT_LIST_GET_LEN(buf_pool->LRU);
-            buf_pool_mutex_exit(buf_pool);
+            for (bpage = UT_LIST_GET_LAST(buf_pool->LRU), scanned = 1;
+                    bpage != NULL &&  scanned < srv_LRU_scan_depth;
+                    ++scanned) {
 
-            scan_depth = ut_min(srv_LRU_scan_depth, scan_depth);
+                prev_bpage = UT_LIST_GET_PREV(LRU, bpage);
 
-            /* We divide LRU flush into smaller chunks because
-               there may be user threads waiting for the flush to
-               end in buf_LRU_get_free_block(). */
-            for (ulint j = 0;
-                    j < scan_depth;
-                    j += PAGE_CLEANER_LRU_BATCH_CHUNK_SIZE) {
+                /* If the target page is io-fixed or already freed, skip the
+                   copy process. */
+                if (!buf_page_can_relocate(bpage) || (bpage->state != BUF_BLOCK_FILE_PAGE)) {
+                    bpage = prev_bpage;
+                    continue;
+                } else if (bpage->oldest_modification == 0) {
+                    /* Target page is a clean page! */
+                    evict_zip = !buf_LRU_evict_from_unzip_LRU(buf_pool);
+                    buf_LRU_free_page(bpage, evict_zip);
 
-                ulint	n_flushed = 0;
-
-                /* Currently page_cleaner is the only thread
-                   that can trigger an LRU flush. It is possible
-                   that a batch triggered during last iteration is
-                   still running, */
-                if (buf_flush_LRU(buf_pool,
-                            PAGE_CLEANER_LRU_BATCH_CHUNK_SIZE,
-                            &n_flushed)) {
-
-                    /* Allowed only one batch per
-                       buffer pool instance. */
-                    buf_flush_wait_batch_end(
-                            buf_pool, BUF_FLUSH_LRU);
+                    bpage = prev_bpage;
+                    continue;
                 }
 
-                if (n_flushed) {
-                    total_flushed += n_flushed;
+                ib_uint32_t space = bpage->space;
+                ib_uint32_t offset = bpage->offset;
+                ulint fold;
+
+                first_free = buf_pool->first_free;
+                buf_pool->first_free++;
+
+                //log_write_up_to(bpage->newest_modification, LOG_WAIT_ALL_GROUPS, TRUE);
+
+                /* Copy the buffer frame into the copy pool. */
+                memcpy(buf_pool->write_buf
+                        + UNIV_PAGE_SIZE * first_free,
+                        ((buf_block_t*) bpage)->frame, UNIV_PAGE_SIZE);
+
+                bpage->copy_target = true;
+                evict_zip = !buf_LRU_evict_from_unzip_LRU(buf_pool);;
+
+                /* Free the target page from the buffer pool. */
+                if (buf_LRU_free_page(bpage, evict_zip)) {
+                    copy_pool_meta_dir_t* new_entry = (copy_pool_meta_dir_t*) malloc(sizeof(copy_pool_meta_dir_t));
+
+                    new_entry->space = space;
+                    new_entry->offset = offset;
+
+                    fold = buf_page_address_fold(space, offset);
+
+                    rw_lock_x_lock(buf_pool->copy_pool_cache_hash_lock);
+                    HASH_INSERT(copy_pool_meta_dir_t, hash, buf_pool->copy_pool_cache, fold, new_entry);
+                    rw_lock_x_unlock(buf_pool->copy_pool_cache_hash_lock);
+
+                    total_copied++;
                 } else {
-                    /* Nothing to flush */
-                    break;
+                    failed++;
                 }
+
+                bpage = prev_bpage;
+            }
+
+            buf_pool->war_running = false;
+            os_event_set(buf_pool->war_event);
+
+            buf_pool->batch_running = false;
+            os_event_set(buf_pool->b_event);
+
+            if (total_copied) {
+                buf_flush_copy_pool(buf_pool, &n_flushed);
+                fprintf(stderr, "war mode %lu: %lu\n", buf_pool->instance_no, n_flushed);
+            } else {
+                buf_pool_mutex_exit(buf_pool);
             }
         }
+
+        if (n_flushed) {
+            total_flushed += n_flushed;
+        }
+        
+        /* end */
     }
 
 	if (total_flushed) {

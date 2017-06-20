@@ -1303,11 +1303,10 @@ loop:
         }
 	}
 
-	buf_pool_mutex_exit(buf_pool);
+    buf_pool_mutex_exit(buf_pool);
 
 	if (freed) {
 		goto loop;
-
 	}
 
 	if (n_iterations > 20) {
@@ -1349,12 +1348,24 @@ loop:
     /* mijin */
     buf_pool_mutex_enter(buf_pool);
 
+    /* mijin */
+    if (buf_pool->war_running) {
+    fprintf(stderr, "wait war flush\n");
+        ib_int64_t  sig_count = os_event_reset(buf_pool->war_event); 
+        buf_pool_mutex_exit(buf_pool);
+
+        os_event_wait_low(buf_pool->war_event, sig_count);
+        goto loop;
+    }
+    /* end */
+
     if (buf_pool->batch_running) {
         buf_pool_mutex_exit(buf_pool);
         goto loop;
     }
 
     if (buf_pool->flush_running) {
+    fprintf(stderr, "wait copy pool flush\n");
         /* Another thread is running the flush right now. Wait
            for it to finish. */
         ib_int64_t  sig_count = os_event_reset(buf_pool->f_event);
@@ -1401,7 +1412,9 @@ loop:
 
         first_free = buf_pool->first_free;
         buf_pool->first_free++;
-      
+     
+        log_write_up_to(bpage->newest_modification, LOG_WAIT_ALL_GROUPS, TRUE);
+
         /* Copy the buffer frame into the copy pool. */
         memcpy(buf_pool->write_buf
                 + UNIV_PAGE_SIZE * first_free,

@@ -1180,6 +1180,9 @@ sync_thread_add_level(
 			ut_a(sync_thread_levels_contain(array, SYNC_LOCK_SYS));
 		}
 		break;
+    /* mijin */
+    case SYNC_COPY_POOL:
+    /* end */
 	case SYNC_BUF_FLUSH_LIST:
 	case SYNC_BUF_POOL:
 		/* We can have multiple mutexes of this type therefore we
