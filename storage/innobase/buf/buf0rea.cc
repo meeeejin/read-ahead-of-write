@@ -179,7 +179,7 @@ buf_read_page_low(
     /* mijin */
     buf_pool_t* buf_pool = buf_pool_get(space, offset);
 
-    if (buf_pool->need_to_flush_copy_pool) {
+    if (buf_pool->need_to_flush_copy_pool || buf_pool->need_to_flush_copy_pool2) {
         ulint fold;
         copy_pool_meta_dir_t* entry;
 

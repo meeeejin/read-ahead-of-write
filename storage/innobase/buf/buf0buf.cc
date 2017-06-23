@@ -1375,21 +1375,37 @@ buf_pool_init_instance(
     buf_pool->need_to_flush_copy_pool = false;
     buf_pool->batch_running = false;
     buf_pool->flush_running = false;
-    buf_pool->war_running = false;
+    
+    buf_pool->use_first_block = true;
+    buf_pool->need_to_flush_copy_pool2 = false;
     
     buf_pool->b_event = os_event_create();
     buf_pool->f_event = os_event_create();
-    buf_pool->war_event = os_event_create();
 
     buf_pool->total_entry = srv_LRU_scan_depth * 4;
     buf_pool->first_free = 0;
+    buf_pool->first_free2 = 0;
 
-    /* Initialize write buffer for copy pool. */
+    /* Initialize write buffer1 for copy pool. */
     buf_pool->write_buf_unaligned = static_cast<byte*>(
             ut_malloc((1 + buf_pool->total_entry) * UNIV_PAGE_SIZE));
 
     buf_pool->write_buf = static_cast<byte*>(
             ut_align(buf_pool->write_buf_unaligned,
+                UNIV_PAGE_SIZE));
+
+    /* Initialize hash structure for copy pool. */
+    buf_pool->copy_pool_cache = ha_create(2 * buf_pool->total_entry,
+            srv_n_page_hash_locks,
+            MEM_HEAP_FOR_PAGE_HASH,
+            SYNC_BUF_PAGE_HASH);
+
+    /* Initialize write buffer2 for copy pool. */
+    buf_pool->write_buf_unaligned2 = static_cast<byte*>(
+            ut_malloc((1 + buf_pool->total_entry) * UNIV_PAGE_SIZE));
+
+    buf_pool->write_buf2 = static_cast<byte*>(
+            ut_align(buf_pool->write_buf_unaligned2,
                 UNIV_PAGE_SIZE));
 
     /* Initialize hash structure for copy pool. */
@@ -1411,9 +1427,22 @@ buf_pool_init_instance(
         assert(!posix_memalign((void **) &(buf_pool->copy_block_arr[i]).frame, 4096, UNIV_PAGE_SIZE));
     }
     
+    /* Initialize a block2 and page structure. */
+    buf_pool->copy_block_arr2 = (buf_block_t*) malloc(sizeof(buf_block_t) * buf_pool->total_entry);
+    for (i = 0; i < buf_pool->total_entry; i++) {
+        memset(&buf_pool->copy_block_arr2[i], 0, sizeof(buf_block_t));
+        mutex_create(buffer_block_mutex_key, &(buf_pool->copy_block_arr2[i]).mutex, SYNC_BUF_BLOCK);
+        rw_lock_create(buf_block_lock_key, &(buf_pool->copy_block_arr2[i]).lock, SYNC_LEVEL_VARYING);
+    
+        assert(!posix_memalign((void **) &(buf_pool->copy_block_arr2[i]).frame, 4096, UNIV_PAGE_SIZE));
+    }
+/*    
     mutex_create(copy_pool_mutex_key,
 		     &buf_pool->copy_pool_mutex, SYNC_COPY_POOL);
-
+    
+    mutex_create(copy_pool_mutex_key,
+		     &buf_pool->copy_pool_mutex2, SYNC_COPY_POOL);
+*/  
     /* end */
 
 	/* All fields are initialized by mem_zalloc(). */
@@ -1475,7 +1504,6 @@ buf_pool_free_instance(
     /* mijin */
     os_event_free(buf_pool->b_event);
     os_event_free(buf_pool->f_event);
-    os_event_free(buf_pool->war_event);
     
     ut_free(buf_pool->write_buf_unaligned);
     buf_pool->write_buf_unaligned = NULL;
@@ -1483,6 +1511,12 @@ buf_pool_free_instance(
     mem_free(buf_pool->copy_block_arr);
     buf_pool->copy_block_arr = NULL;
     
+    ut_free(buf_pool->write_buf_unaligned2);
+    buf_pool->write_buf_unaligned2 = NULL;
+    
+    mem_free(buf_pool->copy_block_arr2);
+    buf_pool->copy_block_arr2 = NULL;
+
 	ha_clear(buf_pool->copy_pool_cache);
 	hash_table_free(buf_pool->copy_pool_cache);
     /* end */
