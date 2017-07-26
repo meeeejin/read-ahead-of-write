@@ -242,6 +242,12 @@ extern ulint*	srv_data_file_is_raw_partition;
 extern ibool	srv_auto_extend_last_data_file;
 extern ulint	srv_last_file_size_max;
 extern char*	srv_log_group_home_dir;
+
+/* mijin */
+extern ulint    srv_ssd_cache_total_ref;
+extern ulint    srv_ssd_cache_hit_ref;
+/* end */
+
 #ifndef UNIV_HOTBACKUP
 extern ulong	srv_auto_extend_increment;
 

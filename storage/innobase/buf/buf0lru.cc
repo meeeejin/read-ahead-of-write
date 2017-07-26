@@ -1348,10 +1348,7 @@ loop:
     /* mijin */
     buf_pool_mutex_enter(buf_pool);
 
-    fprintf(stderr, "copy start %lu\n", buf_pool->instance_no);
-
     if (buf_pool->batch_running) {
-        fprintf(stderr, "batch waiting %lu\n", buf_pool->instance_no);
         buf_pool_mutex_exit(buf_pool);
         goto loop;
     }
@@ -1359,7 +1356,6 @@ loop:
     if (buf_pool->flush_running &&
             ((buf_pool->need_to_flush_copy_pool && buf_pool->use_first_block) ||
              (buf_pool->need_to_flush_copy_pool2 && !buf_pool->use_first_block))) {
-    fprintf(stderr, "flush waiting\n");
         /* Another thread is running the flush right now. Wait
            for it to finish. */
         ib_int64_t  sig_count = os_event_reset(buf_pool->f_event);
@@ -1508,7 +1504,6 @@ loop:
      buf_pool->batch_running = false;
      os_event_set(buf_pool->b_event);
 
-     fprintf(stderr, "copy finished %lu\n", buf_pool->instance_no);
      buf_pool_mutex_exit(buf_pool);
 
      if (total_copied) {

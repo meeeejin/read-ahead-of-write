@@ -274,9 +274,6 @@ UNIV_INTERN mysql_pfs_key_t	buf_block_debug_latch_key;
 #ifdef UNIV_PFS_MUTEX
 UNIV_INTERN mysql_pfs_key_t	buffer_block_mutex_key;
 UNIV_INTERN mysql_pfs_key_t	buf_pool_mutex_key;
-/* mijin */
-UNIV_INTERN mysql_pfs_key_t	copy_pool_mutex_key;
-/* end */
 UNIV_INTERN mysql_pfs_key_t	buf_pool_zip_mutex_key;
 UNIV_INTERN mysql_pfs_key_t	flush_list_mutex_key;
 #endif /* UNIV_PFS_MUTEX */
@@ -1436,13 +1433,6 @@ buf_pool_init_instance(
     
         assert(!posix_memalign((void **) &(buf_pool->copy_block_arr2[i]).frame, 4096, UNIV_PAGE_SIZE));
     }
-/*    
-    mutex_create(copy_pool_mutex_key,
-		     &buf_pool->copy_pool_mutex, SYNC_COPY_POOL);
-    
-    mutex_create(copy_pool_mutex_key,
-		     &buf_pool->copy_pool_mutex2, SYNC_COPY_POOL);
-*/  
     /* end */
 
 	/* All fields are initialized by mem_zalloc(). */
@@ -1502,7 +1492,7 @@ buf_pool_free_instance(
 	hash_table_free(buf_pool->zip_hash);
 
     /* mijin */
-    os_event_free(buf_pool->b_event);
+    /*os_event_free(buf_pool->b_event);
     os_event_free(buf_pool->f_event);
     
     ut_free(buf_pool->write_buf_unaligned);
@@ -1519,7 +1509,7 @@ buf_pool_free_instance(
 
 	ha_clear(buf_pool->copy_pool_cache);
 	hash_table_free(buf_pool->copy_pool_cache);
-    /* end */
+    *//* end */
 }
 
 /********************************************************************//**
@@ -2717,8 +2707,17 @@ loop:
 	}
 
 	if (block == NULL) {
+
 		block = (buf_block_t*) buf_page_hash_get_low(
 			buf_pool, space, offset, fold);
+        
+        /* mijin */
+        /*srv_ssd_cache_total_ref += 1;
+        
+        if (block) {
+            srv_ssd_cache_hit_ref += 1;
+        }*/
+        /* end */
 	}
 
 	if (!block || buf_pool_watch_is_sentinel(buf_pool, &block->page)) {

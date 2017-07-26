@@ -180,6 +180,11 @@ the user from forgetting the 'newraw' keyword to my.cnf */
 
 UNIV_INTERN ibool	srv_created_new_raw	= FALSE;
 
+/* mijin */
+UNIV_INTERN ulint   srv_ssd_cache_total_ref = 0;
+UNIV_INTERN ulint   srv_ssd_cache_hit_ref = 0;
+/* end */
+
 UNIV_INTERN char*	srv_log_group_home_dir	= NULL;
 
 UNIV_INTERN ulong	srv_n_log_files		= SRV_N_LOG_FILES_MAX;
@@ -1240,6 +1245,19 @@ srv_printf_innodb_monitor(
 		dict_sys->size);
 
 	buf_print_io(file);
+
+    /* mijin */
+    fputs("-----------------------\n"
+            "RAW STATUS\n"
+            "-----------------------\n", file);
+    fprintf(file, "total reference count: %lu\n"
+            "hit   reference count: %lu\n"
+            "hit   ratio = %lu / 1000\n",
+            srv_ssd_cache_total_ref,
+            srv_ssd_cache_hit_ref,
+            (ulong) (1000 * srv_ssd_cache_hit_ref
+                / srv_ssd_cache_total_ref));
+    /* end */
 
 	fputs("--------------\n"
 	      "ROW OPERATIONS\n"

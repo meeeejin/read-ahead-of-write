@@ -1018,7 +1018,10 @@ buf_flush_page(
     rw_lock_t*	rw_lock;
     bool            no_fix_count = bpage->buf_fix_count == 0;
 
-    if (!is_uncompressed) {
+    if (!is_uncompressed ||
+        /* mijin */
+        bpage->copy_target    
+        /* end */) {
         flush = TRUE;
         rw_lock = NULL;
 
@@ -2212,8 +2215,6 @@ try_again:
             }
 
             buf_flush_copy_pool(buf_pool, &n_flushed);            
-            
-            fprintf(stderr, "raw mode %lu\n", buf_pool->instance_no);
         } else {
             /* WAR mode */
             buf_page_t* bpage;
@@ -2367,8 +2368,6 @@ try_again:
                     buf_pool_mutex_exit(buf_pool);
                 }
             }
-
-            fprintf(stderr, "war mode %lu\n", buf_pool->instance_no);
         }
 
         if (n_flushed) {
@@ -2654,7 +2653,7 @@ DECLARE_THREAD(buf_flush_page_cleaner_thread)(
 			/*!< in: a dummy parameter required by
 			os_thread_create */
 {
-	ulint	next_loop_time = ut_time_ms() + 1000;
+	ulint	next_loop_time = ut_time_ms() + 500;
 	ulint	n_flushed = 0;
 	ulint	last_activity = srv_get_activity_count();
 
@@ -2682,7 +2681,7 @@ DECLARE_THREAD(buf_flush_page_cleaner_thread)(
 			page_cleaner_sleep_if_needed(next_loop_time);
 		}
 
-		next_loop_time = ut_time_ms() + 1000;
+		next_loop_time = ut_time_ms() + 500;
 
 		if (srv_check_activity(last_activity)) {
 			last_activity = srv_get_activity_count();
@@ -2725,6 +2724,22 @@ DECLARE_THREAD(buf_flush_page_cleaner_thread)(
 	and the purge threads may be working as well. We start flushing
 	the buffer pool but can't be sure that no new pages are being
 	dirtied until we enter SRV_SHUTDOWN_FLUSH_PHASE phase. */
+
+    /* mijin */
+#if 0
+    for (ulint j = 0; j < srv_buf_pool_instances; j++) {
+        buf_pool_t* buf_pool = buf_pool_from_array(j);
+
+        /* Flush copy pool 1. */
+        buf_pool_mutex_enter(buf_pool);
+        buf_flush_copy_pool(buf_pool, &n_flushed);
+       
+        /* Flush copy pool 2. */
+        buf_pool_mutex_enter(buf_pool);
+        buf_flush_copy_pool(buf_pool, &n_flushed);
+    }
+#endif
+    /* end */
 
 	do {
 		n_flushed = page_cleaner_do_flush_batch(PCT_IO(100), LSN_MAX);
