@@ -1,8 +1,8 @@
-commit: 50b1ef519375c4c3c588c0e23846cb72513bf299
-date: 2016-12-06 15:00:10 +0900
-build-date: 2016-12-06 17:49:07 +0900 
-short: 50b1ef5
-branch: master
+commit: 91bd49de3944e45e7e916e330278e83196c538be
+date: 2017-06-13 01:39:08 +0900
+build-date: 2017-07-31 17:02:53 +0900 
+short: 91bd49d
+branch: opt_tmp
 
 
 MySQL source 5.6.26

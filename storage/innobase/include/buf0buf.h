@@ -1996,9 +1996,11 @@ struct buf_pool_t{
     ibool       need_to_flush_copy_pool;
     ibool       batch_running;
     ibool       flush_running;
+    ibool       war_running;
     
     os_event_t  b_event;
     os_event_t  f_event;
+    os_event_t  war_event;
 
     byte*       write_buf_unaligned;
     byte*       write_buf;
@@ -2010,6 +2012,7 @@ struct buf_pool_t{
     rw_lock_t*      copy_pool_cache_hash_lock;
     
     buf_block_t*    copy_block_arr;
+    ib_mutex_t      copy_pool_mutex;
     /* end */
 #if BUF_BUDDY_LOW > UNIV_ZIP_SIZE_MIN
 # error "BUF_BUDDY_LOW > UNIV_ZIP_SIZE_MIN"

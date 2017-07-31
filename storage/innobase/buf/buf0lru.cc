@@ -1303,11 +1303,10 @@ loop:
         }
 	}
 
-	buf_pool_mutex_exit(buf_pool);
+    buf_pool_mutex_exit(buf_pool);
 
 	if (freed) {
 		goto loop;
-
 	}
 
 	if (n_iterations > 20) {
@@ -1348,6 +1347,16 @@ loop:
 
     /* mijin */
     buf_pool_mutex_enter(buf_pool);
+
+    /* mijin */
+    if (buf_pool->war_running) {
+        ib_int64_t  sig_count = os_event_reset(buf_pool->war_event); 
+        buf_pool_mutex_exit(buf_pool);
+
+        os_event_wait_low(buf_pool->war_event, sig_count);
+        goto loop;
+    }
+    /* end */
 
     if (buf_pool->batch_running) {
         buf_pool_mutex_exit(buf_pool);
@@ -1401,7 +1410,9 @@ loop:
 
         first_free = buf_pool->first_free;
         buf_pool->first_free++;
-      
+     
+        log_write_up_to(bpage->newest_modification, LOG_WAIT_ALL_GROUPS, TRUE);
+
         /* Copy the buffer frame into the copy pool. */
         memcpy(buf_pool->write_buf
                 + UNIV_PAGE_SIZE * first_free,

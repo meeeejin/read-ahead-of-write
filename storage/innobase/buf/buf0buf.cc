@@ -274,6 +274,9 @@ UNIV_INTERN mysql_pfs_key_t	buf_block_debug_latch_key;
 #ifdef UNIV_PFS_MUTEX
 UNIV_INTERN mysql_pfs_key_t	buffer_block_mutex_key;
 UNIV_INTERN mysql_pfs_key_t	buf_pool_mutex_key;
+/* mijin */
+UNIV_INTERN mysql_pfs_key_t	copy_pool_mutex_key;
+/* end */
 UNIV_INTERN mysql_pfs_key_t	buf_pool_zip_mutex_key;
 UNIV_INTERN mysql_pfs_key_t	flush_list_mutex_key;
 #endif /* UNIV_PFS_MUTEX */
@@ -1372,9 +1375,11 @@ buf_pool_init_instance(
     buf_pool->need_to_flush_copy_pool = false;
     buf_pool->batch_running = false;
     buf_pool->flush_running = false;
+    buf_pool->war_running = false;
     
     buf_pool->b_event = os_event_create();
     buf_pool->f_event = os_event_create();
+    buf_pool->war_event = os_event_create();
 
     buf_pool->total_entry = srv_LRU_scan_depth * 4;
     buf_pool->first_free = 0;
@@ -1405,6 +1410,10 @@ buf_pool_init_instance(
     
         assert(!posix_memalign((void **) &(buf_pool->copy_block_arr[i]).frame, 4096, UNIV_PAGE_SIZE));
     }
+    
+    mutex_create(copy_pool_mutex_key,
+		     &buf_pool->copy_pool_mutex, SYNC_COPY_POOL);
+
     /* end */
 
 	/* All fields are initialized by mem_zalloc(). */
@@ -1466,6 +1475,7 @@ buf_pool_free_instance(
     /* mijin */
     os_event_free(buf_pool->b_event);
     os_event_free(buf_pool->f_event);
+    os_event_free(buf_pool->war_event);
     
     ut_free(buf_pool->write_buf_unaligned);
     buf_pool->write_buf_unaligned = NULL;
