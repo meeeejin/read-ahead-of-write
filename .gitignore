@@ -658,6 +658,7 @@ isamchk/*.vcproj
 item_xmlfunc.cc
 lib_debug/*
 lib_release/*
+libmysql/*
 libmysql/*.c
 libmysql/*.ds?
 libmysql/*.vcproj
